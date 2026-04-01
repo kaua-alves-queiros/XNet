@@ -232,7 +232,7 @@ struct SiteDetailView: View {
 #Preview("Site Detail (macOS)") {
     #if os(macOS)
     // Placeholder preview for macOS
-    let sampleSite = NetBoxSite(name: "Sample Site", siteDescription: "A sample site for preview", devices: [], prefixes: [])
+    let sampleSite = NetBoxSite(name: "Sample Site", siteDescription: "A sample site for preview")
     SiteDetailView(site: sampleSite)
     #else
     EmptyView()

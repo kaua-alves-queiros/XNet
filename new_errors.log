@@ -1,1 +1,0 @@
-/Users/kaua/Source/XNet/XNet›/Features/NetBox/Components/NetBoxComponents.swift:20:34: error: value of type '@Sendable (ModelContext) -> some View' has no member 'delete'
