@@ -5,6 +5,7 @@ import SwiftData
 struct NetBoxSitesDashboard: View {
     @Query(sort: \NetBoxSite.name) private var sites: [NetBoxSite]
     @Binding var selection: NetBoxView.NetBoxNavigationItem?
+    @Environment(\.modelContext) private var modelContext
     var body: some View {
         List {
             ForEach(sites) { site in
