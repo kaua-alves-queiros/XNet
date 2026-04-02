@@ -66,7 +66,7 @@ class TracerouteService {
                         if Task.isCancelled { break }
                         let startTime = Date()
                         
-                        var header = ICMPHeader(
+                        let header = ICMPHeader(
                             type: 8,
                             code: 0,
                             checksum: 0,

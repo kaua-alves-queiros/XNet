@@ -105,7 +105,7 @@ class IPScannerService {
                     destAddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
                     inet_pton(AF_INET, target, &destAddr.sin_addr)
                     
-                    var header = ICMPHeader(
+                    let header = ICMPHeader(
                         type: 8, code: 0, checksum: 0,
                         identifier: identifier, 
                         sequence: UInt16(index + 1).bigEndian

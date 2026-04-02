@@ -73,7 +73,7 @@ class PingService {
                     let startTime = CFAbsoluteTimeGetCurrent()
                     sequence += 1
                     
-                    var header = ICMPHeader(
+                    let header = ICMPHeader(
                         type: 8, code: 0, checksum: 0,
                         identifier: identifier,
                         sequence: sequence.bigEndian

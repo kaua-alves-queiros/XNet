@@ -199,47 +199,73 @@ struct SubnetCalculatorView: View {
             
             VStack(spacing: 0) {
                 ForEach(Array(breakdownSubnets.enumerated()), id: \.element) { index, subnet in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(subnet)
-                                .font(.system(.body, design: .monospaced))
-                                .bold()
-                            Spacer()
-                            let subInfo = service.calculate(address: String(subnet.split(separator: "/")[0]), cidr: selectedCidr)
-                            Text("\(subInfo?.totalUsable ?? 0) Hosts")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        let ipList = service.getUsableIPs(address: String(subnet.split(separator: "/")[0]), cidr: selectedCidr)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(ipList, id: \.self) { ip in
-                                    Text(ip)
-                                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                        .foregroundStyle(ip.contains("...") ? .secondary : .primary)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(6)
-                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.05), lineWidth: 1))
-                                }
-                            }
-                            .padding(.bottom, 4)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(index % 2 == 0 ? Color.clear : Color(NSColor.alternatingContentBackgroundColors[1]).opacity(0.5))
-                    
-                    if index < breakdownSubnets.count - 1 {
-                        Divider()
-                    }
+                    SubnetBreakdownRow(
+                        subnet: subnet,
+                        selectedCidr: selectedCidr,
+                        service: service,
+                        isAlternating: index % 2 != 0,
+                        showDivider: index < breakdownSubnets.count - 1
+                    )
                 }
             }
             .background(Color(NSColor.textBackgroundColor))
             .cornerRadius(12)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.05), lineWidth: 1))
+        }
+    }
+}
+
+struct SubnetBreakdownRow: View {
+    let subnet: String
+    let selectedCidr: Int
+    let service: SubnetCalculatorService
+    let isAlternating: Bool
+    let showDivider: Bool
+    
+    private var subInfo: SubnetInfo? {
+        service.calculate(address: String(subnet.split(separator: "/")[0]), cidr: selectedCidr)
+    }
+    
+    private var ipList: [String] {
+        service.getUsableIPs(address: String(subnet.split(separator: "/")[0]), cidr: selectedCidr)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(subnet)
+                        .font(.system(.body, design: .monospaced))
+                        .bold()
+                    Spacer()
+                    Text("\(subInfo?.totalUsable ?? 0) Hosts")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(ipList, id: \.self) { ip in
+                            Text(ip)
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .foregroundStyle(ip.contains("...") ? .secondary : .primary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(6)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.05), lineWidth: 1))
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(isAlternating ? Color(NSColor.alternatingContentBackgroundColors[1]).opacity(0.5) : Color.clear)
+            
+            if showDivider {
+                Divider()
+            }
         }
     }
 }
