@@ -123,6 +123,34 @@ class SubnetCalculatorService {
         }
         return results
     }
+    func getUsableIPs(address: String, cidr: Int) -> [String] {
+        guard let ipUInt = ipToUInt32(address) else { return [] }
+        let prefix = max(0, min(32, cidr))
+        let maskUInt: UInt32 = prefix == 0 ? 0 : (0xFFFFFFFF << (32 - prefix))
+        let networkUInt = ipUInt & maskUInt
+        let broadcastUInt = networkUInt | (~maskUInt)
+        
+        var results: [String] = []
+        if prefix <= 30 {
+            let start = networkUInt + 1
+            let end = broadcastUInt - 1
+            
+            // Limitador seguro para não travar a View caso seja uma classe B/A gigantesca
+            let maxCount = min(UInt32(256), (end >= start) ? (end - start) + 1 : 0)
+            for i in 0..<maxCount {
+                results.append(uint32ToIp(start + i))
+            }
+            if maxCount < ((end >= start) ? (end - start) + 1 : 0) {
+                results.append("... + \(((end - start) + 1) - maxCount) IPs")
+            }
+        } else if prefix == 31 {
+            results.append(uint32ToIp(networkUInt))
+            results.append(uint32ToIp(broadcastUInt))
+        } else {
+            results.append(uint32ToIp(networkUInt))
+        }
+        return results
+    }
 }
 
 extension String {
