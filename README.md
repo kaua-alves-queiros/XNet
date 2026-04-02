@@ -2,90 +2,94 @@
 
 **XNet›** is a native, high-performance macOS utility suite designed specifically for Network Operations Center (NOC) professionals and network engineers. Built 100% in Swift and SwiftUI, it provides a comprehensive set of diagnostic and remote management tools in a clean, modern interface.
 
-![XNet Icon](https://img.shields.io/badge/Platform-macOS%2015.0+-blue.svg)
-![Swift Version](https://img.shields.io/badge/Swift-6.0-orange.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+[![Platform](https://img.shields.io/badge/Platform-macOS%2015.0+-blue.svg)](https://apple.com)
+[![Swift Version](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+  <img src="assets/screenshots/ip_scan.png" width="400" alt="IP Scanner">
+  <img src="assets/screenshots/port.png" width="400" alt="Port Scanner">
+  <br>
+  <img src="assets/screenshots/subnet.png" width="400" alt="Subnet Calculator">
+  <img src="assets/screenshots/subnet_breakdown.png" width="400" alt="Subnet Partitioning">
+  <br>
+  <img src="assets/screenshots/ping.png" width="400" alt="Visual Ping">
+  <img src="assets/screenshots/traceroute.png" width="400" alt="Traceroute">
+  <br>
+  <img src="assets/screenshots/terminal.png" width="400" alt="SSH/Telnet Terminal">
+  <img src="assets/screenshots/ftp.png" width="400" alt="FTP/SFTP Client">
+</div>
 
 ---
 
 ## ✨ Features
 
 ### 🔍 Diagnostics
-- **IP Scanner**: High-speed discovery of devices on local and public networks.
-- **Port Scanner**: Rapidly identify open services and potential vulnerabilities.
-- **Visual Ping**: Real-time ICMP monitoring with latency statistics.
-- **Traceroute**: Map network hops and identify routing bottlenecks.
+- **IP Scanner**: High-speed discovery of devices on local and public networks with real-time status indicators.
+- **Port Scanner**: Rapidly identify open services and potential vulnerabilities with service identification.
+- **Visual Ping**: Real-time ICMP monitoring with high-fidelity latency statistics and history.
+- **Traceroute**: Map network hops and identify routing bottlenecks with visual feedback.
 
 ### 📐 Planning & Infrastructure (NetBox)
-- **NetBox Dashboard (DCIM & IPAM)**: 
-  - **Site Management**: Physical PoP and node organization with deep inventory viewing.
-  - **Hardware Inventory**: Integrated DCIM for routers, switches, and servers.
-  - **IPAM (Global Subnets)**: Hierarchical IPv4 IP management with high-performance prefix allocation.
-  - **VLAN Availability Map**: Automatic mathematical calculation of free ID ranges (VLAN Rollout) mirroring professional NetBox experience.
-  - **Multi-IP Support**: Link multiple IP addresses (WAN, LAN, Loopback) to a single device.
-  - **Searchable Inventory**: High-performance device selector for rapid IP assignment.
-  - **Interactive Navigation**: Cascading selection from sites to devices and IP prefixes.
-  - **SwiftData Persistence**: Fully persistent local database with high-integrity relationships.
+- **NetBox Dashboard**: Integrated DCIM & IPAM for hardware inventory and global subnet management.
+- **VLAN Availability Map**: Automatic mathematical calculation of free ID ranges (VLAN Rollout).
+- **SwiftData Persistence**: Fully persistent local database with high-integrity relationships.
 
-- **Subnet Calculator (The Planner)**: 
-  - Advanced IPv4 bitwise calculations with **64-bit Overflow Protection**.
-  - Real-time updates for Network, Broadcast, Mask, and Wildcard info.
-  - **Binary Visualizer**: See the exact bit-level split between network and host portions.
+### 📐 Subnet Calculator (The Planner)
+- **Advanced Calculations**: IPv4 bitwise calculations with CIDR support and VLSM partitioning.
+- **Binary Visualizer**: Exact bit-level representation of the network and host portions.
+- **Interactive Breakdown**: Generate and visualize usable IP ranges for any sub-partition.
 
-### 🖥️ Remote Access
-- **Unified Terminal**: A single, powerful interface for remote sessions.
-- **SSH & Telnet**: Secure and interactive terminal sessions.
-- **Native Serial/COM Port**: Complete POSIX-based serial communication (8N1) for configuring routers, switches, and IoT devices (Arduino, ESP32, etc.) directly via USB-Serial.
-
-### 📁 File Transfer
-- **FTP/SFTP Client**: Integrated file management for remote servers with a dual-pane-inspired experience.
+### 🖥️ Remote Access & File Transfer
+- **Unified Terminal**: Support for SSH, Telnet, and Native Serial/COM Port (POSIX-based) for hardware configuration.
+- **FTP/SFTP Client**: Integrated file management for remote servers with a professional dual-pane experience.
 
 ---
 
 ## 🛠️ Architecture
 
-XNet› follows a **Feature-Based Modular Architecture**, ensuring high scalability and maintainability:
-
-- **App**: Core application lifecycle and routing logic.
-- **Core**: Shared models, common diagnostic types, and navigation definitions.
-- **Features**: Completely isolated modules for each tool (Ping, NetBox, Terminal, etc.), containing their own Views, Components, and Services.
-- **Componentized UI**: The NetBox module uses a decoupled view architecture (Dashboards, Detail Views, and Specialized Sheets) for maximum performance and Xcode stability.
+XNet› follows a **Feature-Based Modular Architecture** for maximum scalability:
+- **Core**: Shared models and low-level diagnostic engines.
+- **Features**: Highly decoupled modules (Ping, NetBox, Terminal, etc.) for isolation and stability.
+- **Componentized UI**: Advanced SwiftUI layouts with high-performance list rendering.
 
 ---
 
 ## 🚀 Installation & Distribution
 
-XNet› is designed for distribution outside the Mac App Store to allow for low-level system access (POSIX sockets and serial ports).
+XNet› is designed for high-precision networking tasks and is distributed as an Ad-Hoc signed DMG.
 
 ### Prerequisites
 - macOS 15.0 or later.
-- Xcode 16.0+ (to build from source).
+- To build: Xcode 16.0+
 
 ### Building from Source
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/kaua-alves-queiros/XNet.git
-   ```
-2. Open `XNet›.xcodeproj` in Xcode.
-3. Select your target and run (`Cmd + R`).
+```bash
+git clone https://github.com/kaua-alves-queiros/XNet.git
+cd XNet
+# Open XNet›.xcodeproj and run (Cmd + R)
+```
 
 ---
 
 ## 🏗️ Tech Stack
-- **Languages**: Swift 6.0
-- **Frameworks**: SwiftUI (Observation API), Network.framework, SwiftData.
-- **APIs**: POSIX (termios, sockets) for low-level network and serial access.
+- **Language**: Swift 6.0
+- **Frameworks**: SwiftUI (Observation), SwiftData, Network.framework
+- **Engines**: Raw Sockets (POSIX), Termios for Serial COM access.
 
 ---
 
 ## 🤝 Contribution
-
-Contributions are welcome! Whether it's adding new NOC tools or improving UI/UX, feel free to open a Pull Request or Issue.
+Contributions are welcome! Please feel free to open a Pull Request or Issue for new tool requests or UI improvements.
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ---
 
