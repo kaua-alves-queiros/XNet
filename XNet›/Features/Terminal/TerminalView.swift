@@ -4,7 +4,7 @@ import Security
 
 struct TerminalView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var savedDevices: [TerminalDevice] = []
+    @State private var savedDevices: [TerminalDeviceEntry] = []
     
     @State private var connectionType: ConnectionType = .ssh
     @State private var host: String = ""
@@ -13,9 +13,9 @@ struct TerminalView: View {
     @State private var savedPassword: String = ""
     @State private var manager = TerminalConnectionManager()
     @State private var availableSerialPorts: [String] = []
-    @State private var selectedDeviceID: PersistentIdentifier?
+    @State private var selectedDeviceID: UUID?
     @State private var showingDeviceForm = false
-    @State private var editingDevice: TerminalDevice?
+    @State private var editingDevice: TerminalDeviceEntry?
     @State private var isApplyingSavedDevice = false
     @State private var isDeviceListVisible = true
     @State private var tabs: [TerminalTabItem] = [TerminalTabItem(name: "Aba 1")]
@@ -147,9 +147,8 @@ struct TerminalView: View {
                         
                         List(savedDevices, selection: $selectedDeviceID) { device in
                             Button {
-                                selectedDeviceID = device.persistentModelID
-                                applyDevice(device)
-                                connectFromDevice(device)
+                                selectedDeviceID = device.id
+                                openDeviceInNewTab(device)
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(device.name)
@@ -163,7 +162,7 @@ struct TerminalView: View {
                             .buttonStyle(.plain)
                             .contextMenu {
                                 Button("Editar") {
-                                    selectedDeviceID = device.persistentModelID
+                                    selectedDeviceID = device.id
                                     editingDevice = device
                                     showingDeviceForm = true
                                 }
@@ -444,12 +443,12 @@ struct TerminalView: View {
         }
     }
     
-    private var selectedDevice: TerminalDevice? {
+    private var selectedDevice: TerminalDeviceEntry? {
         guard let selectedDeviceID else { return nil }
-        return savedDevices.first(where: { $0.persistentModelID == selectedDeviceID })
+        return savedDevices.first(where: { $0.id == selectedDeviceID })
     }
     
-    private func applyDevice(_ device: TerminalDevice) {
+    private func applyDevice(_ device: TerminalDeviceEntry) {
         isApplyingSavedDevice = true
         connectionType = ConnectionType(rawValue: device.connectionType) ?? .ssh
         host = device.host
@@ -467,7 +466,7 @@ struct TerminalView: View {
         }
     }
     
-    private func connectFromDevice(_ device: TerminalDevice) {
+    private func connectFromDevice(_ device: TerminalDeviceEntry) {
         if manager.isConnected {
             manager.disconnect()
         }
@@ -477,69 +476,133 @@ struct TerminalView: View {
         }
     }
     
+    private func openDeviceInNewTab(_ device: TerminalDeviceEntry) {
+        saveCurrentTabState()
+        let newTab = TerminalTabItem(name: device.name)
+        tabs.append(newTab)
+        selectedTabID = newTab.id
+        loadTab(newTab)
+        applyDevice(device)
+        connectUsingCurrentFields()
+        saveCurrentTabState()
+    }
+    
     private func saveDevice(_ payload: TerminalDevicePayload) {
-        var savedID: PersistentIdentifier?
-        if let existing = editingDevice {
-            existing.name = payload.name
-            existing.connectionType = payload.connectionType
-            existing.host = payload.host
-            existing.port = payload.port
-            existing.username = payload.username
-            existing.notes = payload.notes
-            savedID = existing.persistentModelID
-            if payload.password.isEmpty {
-                TerminalPasswordStore.deletePassword(credentialID: existing.credentialID)
-            } else {
-                TerminalPasswordStore.savePassword(payload.password, credentialID: existing.credentialID)
-            }
+        let credentialID = editingDevice?.credentialID ?? UUID().uuidString
+        let entry = TerminalDeviceEntry(
+            id: editingDevice?.id ?? UUID(),
+            name: payload.name,
+            connectionType: payload.connectionType,
+            host: payload.host,
+            port: payload.port,
+            username: payload.username,
+            notes: payload.notes,
+            credentialID: credentialID
+        )
+        
+        if let index = savedDevices.firstIndex(where: { $0.id == entry.id }) {
+            savedDevices[index] = entry
         } else {
-            let device = TerminalDevice(
-                name: payload.name,
-                connectionType: payload.connectionType,
-                host: payload.host,
-                port: payload.port,
-                username: payload.username,
-                notes: payload.notes
-            )
-            modelContext.insert(device)
-            savedID = device.persistentModelID
-            if !payload.password.isEmpty {
-                TerminalPasswordStore.savePassword(payload.password, credentialID: device.credentialID)
-            }
+            savedDevices.append(entry)
         }
-        do {
-            try modelContext.save()
-            reloadSavedDevices()
-            if let savedID {
-                selectedDeviceID = savedID
-            }
-        } catch {
-            manager.logs += "\n[Database Save Error]: \(error.localizedDescription)\n"
+        savedDevices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        selectedDeviceID = entry.id
+        persistSavedDevicesCache()
+        
+        if payload.password.isEmpty {
+            TerminalPasswordStore.deletePassword(credentialID: credentialID)
+        } else {
+            TerminalPasswordStore.savePassword(payload.password, credentialID: credentialID)
         }
+        
+        syncEntryToDatabase(entry)
         editingDevice = nil
     }
     
-    private func deleteDevice(_ device: TerminalDevice) {
+    private func deleteDevice(_ device: TerminalDeviceEntry) {
         TerminalPasswordStore.deletePassword(credentialID: device.credentialID)
-        modelContext.delete(device)
-        do {
-            try modelContext.save()
-            reloadSavedDevices()
-        } catch {
-            manager.logs += "\n[Database Delete Error]: \(error.localizedDescription)\n"
+        savedDevices.removeAll { $0.id == device.id }
+        persistSavedDevicesCache()
+        
+        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
+        if let records = try? modelContext.fetch(descriptor) {
+            if let dbRecord = records.first(where: { $0.credentialID == device.credentialID }) {
+                modelContext.delete(dbRecord)
+                do {
+                    try modelContext.save()
+                } catch {
+                    manager.logs += "\n[Database Delete Error]: \(error.localizedDescription)\n"
+                }
+            }
         }
-        if selectedDeviceID == device.persistentModelID {
+        
+        if selectedDeviceID == device.id {
             selectedDeviceID = nil
         }
     }
     
     private func reloadSavedDevices() {
+        if let data = UserDefaults.standard.data(forKey: TerminalDeviceEntry.storageKey),
+           let cached = try? JSONDecoder().decode([TerminalDeviceEntry].self, from: data),
+           !cached.isEmpty {
+            savedDevices = cached.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return
+        }
+        
         let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
         do {
-            savedDevices = try modelContext.fetch(descriptor)
+            let rows = try modelContext.fetch(descriptor)
+            savedDevices = rows.map {
+                TerminalDeviceEntry(
+                    id: UUID(),
+                    name: $0.name,
+                    connectionType: $0.connectionType,
+                    host: $0.host,
+                    port: $0.port,
+                    username: $0.username,
+                    notes: $0.notes,
+                    credentialID: $0.credentialID
+                )
+            }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            persistSavedDevicesCache()
         } catch {
             savedDevices = []
             manager.logs += "\n[Database Fetch Error]: \(error.localizedDescription)\n"
+        }
+    }
+    
+    private func syncEntryToDatabase(_ entry: TerminalDeviceEntry) {
+        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
+        do {
+            let rows = try modelContext.fetch(descriptor)
+            if let existing = rows.first(where: { $0.credentialID == entry.credentialID }) {
+                existing.name = entry.name
+                existing.connectionType = entry.connectionType
+                existing.host = entry.host
+                existing.port = entry.port
+                existing.username = entry.username
+                existing.notes = entry.notes
+            } else {
+                let row = TerminalDevice(
+                    name: entry.name,
+                    connectionType: entry.connectionType,
+                    host: entry.host,
+                    port: entry.port,
+                    username: entry.username,
+                    notes: entry.notes,
+                    credentialID: entry.credentialID
+                )
+                modelContext.insert(row)
+            }
+            try modelContext.save()
+        } catch {
+            manager.logs += "\n[Database Save Error]: \(error.localizedDescription)\n"
+        }
+    }
+    
+    private func persistSavedDevicesCache() {
+        if let data = try? JSONEncoder().encode(savedDevices) {
+            UserDefaults.standard.set(data, forKey: TerminalDeviceEntry.storageKey)
         }
     }
 }
