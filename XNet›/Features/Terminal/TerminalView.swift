@@ -617,6 +617,19 @@ private struct TerminalDevicePayload {
     var notes: String
 }
 
+private struct TerminalDeviceEntry: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var connectionType: String
+    var host: String
+    var port: String
+    var username: String
+    var notes: String
+    var credentialID: String
+    
+    static let storageKey = "terminal.device.cache.v2"
+}
+
 private struct TerminalTabItem: Identifiable {
     let id = UUID()
     var name: String
