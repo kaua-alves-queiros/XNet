@@ -20,6 +20,7 @@ struct TerminalView: View {
     @State private var tabs: [TerminalTabItem] = []
     @State private var selectedTabID: UUID? = nil
     @State private var deviceSearch = ""
+    @State private var expandedGroups: Set<String> = []
     
     enum ConnectionType: String, CaseIterable, Identifiable {
         case ssh = "SSH", telnet = "Telnet", serial = "Serial"
@@ -158,79 +159,42 @@ struct TerminalView: View {
                         .padding(.top, 10)
                         
                         ScrollView {
-                            LazyVStack(spacing: 8) {
-                                ForEach(filteredSavedDevices) { device in
-                                    HStack(spacing: 10) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.blue.opacity(0.22))
-                                                .frame(width: 28, height: 28)
-                                            Image(systemName: "terminal")
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .foregroundStyle(.blue)
-                                        }
-                                        
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(device.name)
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .lineLimit(1)
-                                            Text("\(device.connectionType.lowercased()), \(device.username.isEmpty ? "sem user" : device.username)")
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(.secondary)
-                                            Text("\(device.host):\(device.port)")
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectedDeviceID = device.id
-                                        }
-                                        
-                                        HStack(spacing: 4) {
-                                            Button {
-                                                selectedDeviceID = device.id
-                                                editingDevice = device
-                                                showingDeviceForm = true
-                                            } label: {
-                                                Image(systemName: "square.and.pencil")
-                                                    .font(.system(size: 10, weight: .bold))
+                            LazyVStack(spacing: 10) {
+                                ForEach(groupedFilteredSavedDevices, id: \.group) { groupItem in
+                                    VStack(spacing: 6) {
+                                        Button {
+                                            toggleGroup(groupItem.group)
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: expandedGroups.contains(groupItem.group) ? "folder.fill" : "folder")
+                                                    .foregroundStyle(.secondary)
+                                                Text(groupItem.group)
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                Text("\(groupItem.devices.count)")
+                                                    .font(.system(size: 10, weight: .semibold))
+                                                    .foregroundStyle(.secondary)
+                                                    .padding(.horizontal, 7)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.primary.opacity(0.08))
+                                                    .clipShape(Capsule())
+                                                Spacer()
+                                                Image(systemName: expandedGroups.contains(groupItem.group) ? "chevron.down" : "chevron.right")
+                                                    .font(.system(size: 10, weight: .semibold))
+                                                    .foregroundStyle(.secondary)
                                             }
-                                            .buttonStyle(.bordered)
-                                            .controlSize(.mini)
-                                            
-                                            Button {
-                                                selectedDeviceID = device.id
-                                                openDeviceInNewTab(device)
-                                            } label: {
-                                                Image(systemName: "play.fill")
-                                                    .font(.system(size: 10, weight: .bold))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 7)
+                                            .background(Color.primary.opacity(0.05))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        }
+                                        .buttonStyle(.plain)
+                                        
+                                        if expandedGroups.contains(groupItem.group) {
+                                            VStack(spacing: 8) {
+                                                ForEach(groupItem.devices) { device in
+                                                    deviceRow(device)
+                                                }
                                             }
-                                            .buttonStyle(.borderedProminent)
-                                            .controlSize(.mini)
-                                        }
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(selectedDeviceID == device.id ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.03))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(selectedDeviceID == device.id ? Color.accentColor.opacity(0.45) : Color.white.opacity(0.06), lineWidth: 1)
-                                    )
-                                    .contextMenu {
-                                        Button("Editar") {
-                                            selectedDeviceID = device.id
-                                            editingDevice = device
-                                            showingDeviceForm = true
-                                        }
-                                        Button("Conectar") {
-                                            selectedDeviceID = device.id
-                                            openDeviceInNewTab(device)
-                                        }
-                                        Button("Excluir", role: .destructive) {
-                                            deleteDevice(device)
                                         }
                                     }
                                 }
@@ -283,6 +247,7 @@ struct TerminalView: View {
         .navigationTitle("")
         .onAppear {
             reloadSavedDevices()
+            refreshExpandedGroups()
             if connectionType == .serial {
                 availableSerialPorts = manager.getAvailableSerialPorts()
             }
@@ -297,6 +262,9 @@ struct TerminalView: View {
         .onChange(of: port) { _, _ in saveCurrentTabState() }
         .onChange(of: username) { _, _ in saveCurrentTabState() }
         .onChange(of: savedPassword) { _, _ in saveCurrentTabState() }
+        .onChange(of: deviceSearch) { _, _ in
+            refreshExpandedGroups()
+        }
         .sheet(isPresented: $showingDeviceForm) {
             TerminalDeviceFormSheet(deviceToEdit: editingDevice) { payload in
                 saveDevice(payload)
@@ -480,6 +448,15 @@ struct TerminalView: View {
             || $0.host.localizedCaseInsensitiveContains(term)
             || $0.username.localizedCaseInsensitiveContains(term)
             || $0.connectionType.localizedCaseInsensitiveContains(term)
+            || normalizedGroupName($0.groupName).localizedCaseInsensitiveContains(term)
+        }
+    }
+    
+    private var groupedFilteredSavedDevices: [(group: String, devices: [TerminalDeviceEntry])] {
+        let grouped = Dictionary(grouping: filteredSavedDevices) { normalizedGroupName($0.groupName) }
+        return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { key in
+            let devices = (grouped[key] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return (group: key, devices: devices)
         }
     }
     
@@ -527,6 +504,7 @@ struct TerminalView: View {
         let entry = TerminalDeviceEntry(
             id: editingDevice?.id ?? UUID(),
             name: payload.name,
+            groupName: payload.groupName,
             connectionType: payload.connectionType,
             host: payload.host,
             port: payload.port,
@@ -543,6 +521,7 @@ struct TerminalView: View {
         savedDevices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         selectedDeviceID = entry.id
         persistSavedDevicesCache()
+        refreshExpandedGroups()
         
         if payload.password.isEmpty {
             credentialCandidates(for: entry).forEach { TerminalPasswordStore.deletePassword(credentialID: $0) }
@@ -563,6 +542,7 @@ struct TerminalView: View {
         credentialCandidates(for: device).forEach { TerminalPasswordStore.deletePassword(credentialID: $0) }
         savedDevices.removeAll { $0.id == device.id }
         persistSavedDevicesCache()
+        refreshExpandedGroups()
         
         let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
         if let records = try? modelContext.fetch(descriptor) {
@@ -590,6 +570,7 @@ struct TerminalView: View {
                     TerminalDeviceEntry(
                         id: UUID(),
                         name: $0.name,
+                        groupName: $0.groupName,
                         connectionType: $0.connectionType,
                         host: $0.host,
                         port: $0.port,
@@ -599,6 +580,7 @@ struct TerminalView: View {
                     )
                 }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
                 persistSavedDevicesCache()
+                refreshExpandedGroups()
                 return
             }
         } catch {
@@ -612,6 +594,7 @@ struct TerminalView: View {
         } else {
             savedDevices = []
         }
+        refreshExpandedGroups()
     }
     
     private func syncEntryToDatabase(_ entry: TerminalDeviceEntry) {
@@ -620,6 +603,7 @@ struct TerminalView: View {
             let rows = try modelContext.fetch(descriptor)
             if let existing = rows.first(where: { $0.credentialID == entry.credentialID }) {
                 existing.name = entry.name
+                existing.groupName = normalizedGroupName(entry.groupName)
                 existing.connectionType = entry.connectionType
                 existing.host = entry.host
                 existing.port = entry.port
@@ -628,6 +612,7 @@ struct TerminalView: View {
             } else {
                 let row = TerminalDevice(
                     name: entry.name,
+                    groupName: normalizedGroupName(entry.groupName),
                     connectionType: entry.connectionType,
                     host: entry.host,
                     port: entry.port,
@@ -652,6 +637,112 @@ struct TerminalView: View {
     private func normalizedCredentialID(existing: String?) -> String {
         let trimmed = existing?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? UUID().uuidString : trimmed
+    }
+    
+    private func normalizedGroupName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Geral" : trimmed
+    }
+    
+    private func toggleGroup(_ group: String) {
+        if expandedGroups.contains(group) {
+            expandedGroups.remove(group)
+        } else {
+            expandedGroups.insert(group)
+        }
+    }
+    
+    private func refreshExpandedGroups() {
+        let available = Set(groupedFilteredSavedDevices.map(\.group))
+        if available.isEmpty {
+            expandedGroups = []
+            return
+        }
+        if expandedGroups.isEmpty {
+            expandedGroups = available
+            return
+        }
+        expandedGroups = expandedGroups.intersection(available)
+        if expandedGroups.isEmpty {
+            expandedGroups = available
+        }
+    }
+    
+    @ViewBuilder
+    private func deviceRow(_ device: TerminalDeviceEntry) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.blue.opacity(0.22))
+                    .frame(width: 28, height: 28)
+                Image(systemName: "terminal")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.blue)
+            }
+            
+            VStack(alignment: .leading, spacing: 3) {
+                Text(device.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Text("\(device.connectionType.lowercased()), \(device.username.isEmpty ? "sem user" : device.username)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Text("\(device.host):\(device.port)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selectedDeviceID = device.id
+            }
+            
+            HStack(spacing: 4) {
+                Button {
+                    selectedDeviceID = device.id
+                    editingDevice = device
+                    showingDeviceForm = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                
+                Button {
+                    selectedDeviceID = device.id
+                    openDeviceInNewTab(device)
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(selectedDeviceID == device.id ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(selectedDeviceID == device.id ? Color.accentColor.opacity(0.45) : Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .contextMenu {
+            Button("Editar") {
+                selectedDeviceID = device.id
+                editingDevice = device
+                showingDeviceForm = true
+            }
+            Button("Conectar") {
+                selectedDeviceID = device.id
+                openDeviceInNewTab(device)
+            }
+            Button("Excluir", role: .destructive) {
+                deleteDevice(device)
+            }
+        }
     }
     
     private func normalizedCredentialID(for entry: TerminalDeviceEntry) -> String {
@@ -707,6 +798,7 @@ struct TerminalView: View {
 
 private struct TerminalDevicePayload {
     var name: String
+    var groupName: String
     var connectionType: String
     var host: String
     var port: String
@@ -718,6 +810,7 @@ private struct TerminalDevicePayload {
 private struct TerminalDeviceEntry: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
+    var groupName: String
     var connectionType: String
     var host: String
     var port: String
@@ -725,7 +818,57 @@ private struct TerminalDeviceEntry: Identifiable, Codable, Equatable {
     var notes: String
     var credentialID: String
     
-    static let storageKey = "terminal.device.cache.v2"
+    static let storageKey = "terminal.device.cache.v3"
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case groupName
+        case connectionType
+        case host
+        case port
+        case username
+        case notes
+        case credentialID
+    }
+    
+    init(id: UUID, name: String, groupName: String, connectionType: String, host: String, port: String, username: String, notes: String, credentialID: String) {
+        self.id = id
+        self.name = name
+        self.groupName = groupName
+        self.connectionType = connectionType
+        self.host = host
+        self.port = port
+        self.username = username
+        self.notes = notes
+        self.credentialID = credentialID
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        groupName = try container.decodeIfPresent(String.self, forKey: .groupName) ?? "Geral"
+        connectionType = try container.decode(String.self, forKey: .connectionType)
+        host = try container.decode(String.self, forKey: .host)
+        port = try container.decode(String.self, forKey: .port)
+        username = try container.decode(String.self, forKey: .username)
+        notes = try container.decode(String.self, forKey: .notes)
+        credentialID = try container.decode(String.self, forKey: .credentialID)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(groupName, forKey: .groupName)
+        try container.encode(connectionType, forKey: .connectionType)
+        try container.encode(host, forKey: .host)
+        try container.encode(port, forKey: .port)
+        try container.encode(username, forKey: .username)
+        try container.encode(notes, forKey: .notes)
+        try container.encode(credentialID, forKey: .credentialID)
+    }
 }
 
 private struct TerminalTabItem: Identifiable {
@@ -753,6 +896,7 @@ private struct TerminalDeviceFormSheet: View {
     
     @State private var name = ""
     @State private var connectionType: TerminalView.ConnectionType = .ssh
+    @State private var groupName = "Geral"
     @State private var host = ""
     @State private var port = "22"
     @State private var username = ""
@@ -766,6 +910,7 @@ private struct TerminalDeviceFormSheet: View {
             
             Form {
                 TextField("Nome", text: $name)
+                TextField("Grupo/Pasta", text: $groupName)
                 Picker("Tipo", selection: $connectionType) {
                     ForEach(TerminalView.ConnectionType.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -790,6 +935,7 @@ private struct TerminalDeviceFormSheet: View {
                     onSave(
                         TerminalDevicePayload(
                             name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Dispositivo" : name,
+                            groupName: groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Geral" : groupName,
                             connectionType: connectionType.rawValue,
                             host: host,
                             port: port,
@@ -810,6 +956,7 @@ private struct TerminalDeviceFormSheet: View {
             guard let device = deviceToEdit else { return }
             name = device.name
             connectionType = TerminalView.ConnectionType(rawValue: device.connectionType) ?? .ssh
+            groupName = device.groupName
             host = device.host
             port = device.port
             username = device.username

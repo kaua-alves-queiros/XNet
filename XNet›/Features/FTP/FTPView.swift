@@ -19,6 +19,7 @@ struct FTPView: View {
     @State private var password = ""
     @State private var transferProtocol: TransferProtocolType = .sftp
     @State private var selectedCredentialID: String?
+    @State private var selectedGroupFilter = "Todos"
     
     var body: some View {
         VStack(spacing: 0) {
@@ -137,7 +138,7 @@ struct FTPView: View {
                 
                 if !registeredDevices.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Text("Dispositivos Cadastrados")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
@@ -148,11 +149,22 @@ struct FTPView: View {
                                 .padding(.vertical, 2)
                                 .background(Color.primary.opacity(0.08))
                                 .clipShape(Capsule())
+                            Menu {
+                                ForEach(availableGroupFilters, id: \.self) { group in
+                                    Button(group) {
+                                        selectedGroupFilter = group
+                                    }
+                                }
+                            } label: {
+                                Label(selectedGroupFilter, systemImage: "folder")
+                                    .font(.caption)
+                            }
+                            .menuStyle(.borderlessButton)
                         }
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(registeredDevices) { device in
+                                ForEach(filteredRegisteredDevices) { device in
                                     Button {
                                         applyDeviceToFTP(device)
                                     } label: {
@@ -162,6 +174,10 @@ struct FTPView: View {
                                             VStack(alignment: .leading, spacing: 1) {
                                                 Text(device.name)
                                                     .font(.system(size: 11, weight: .semibold))
+                                                    .lineLimit(1)
+                                                Text(normalizedGroupName(device.groupName))
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(.secondary)
                                                     .lineLimit(1)
                                                 Text("\(device.host):\(device.port)")
                                                     .font(.system(size: 10))
@@ -219,6 +235,9 @@ struct FTPView: View {
     private func loadRegisteredDevices() {
         let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
         registeredDevices = (try? modelContext.fetch(descriptor)) ?? []
+        if !availableGroupFilters.contains(selectedGroupFilter) {
+            selectedGroupFilter = "Todos"
+        }
     }
     
     private func applyDeviceToFTP(_ device: TerminalDevice) {
@@ -246,6 +265,23 @@ struct FTPView: View {
             return "externaldrive.connected.to.line.below"
         }
         return "lock.shield"
+    }
+    
+    private var availableGroupFilters: [String] {
+        let names = Set(registeredDevices.map { normalizedGroupName($0.groupName) })
+        return ["Todos"] + names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+    
+    private var filteredRegisteredDevices: [TerminalDevice] {
+        if selectedGroupFilter == "Todos" {
+            return registeredDevices
+        }
+        return registeredDevices.filter { normalizedGroupName($0.groupName) == selectedGroupFilter }
+    }
+    
+    private func normalizedGroupName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Geral" : trimmed
     }
 }
 
