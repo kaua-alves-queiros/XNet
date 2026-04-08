@@ -4,7 +4,7 @@ import Security
 
 struct TerminalView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \TerminalDevice.name) private var savedDevices: [TerminalDevice]
+    @State private var savedDevices: [TerminalDevice] = []
     
     @State private var connectionType: ConnectionType = .ssh
     @State private var host: String = ""
@@ -199,6 +199,7 @@ struct TerminalView: View {
                 selectedTabID = first.id
                 loadTab(first)
             }
+            reloadSavedDevices()
             if connectionType == .serial {
                 availableSerialPorts = manager.getAvailableSerialPorts()
             }
@@ -477,6 +478,7 @@ struct TerminalView: View {
     }
     
     private func saveDevice(_ payload: TerminalDevicePayload) {
+        var savedID: PersistentIdentifier?
         if let existing = editingDevice {
             existing.name = payload.name
             existing.connectionType = payload.connectionType
@@ -484,6 +486,7 @@ struct TerminalView: View {
             existing.port = payload.port
             existing.username = payload.username
             existing.notes = payload.notes
+            savedID = existing.persistentModelID
             if payload.password.isEmpty {
                 TerminalPasswordStore.deletePassword(credentialID: existing.credentialID)
             } else {
@@ -499,12 +502,17 @@ struct TerminalView: View {
                 notes: payload.notes
             )
             modelContext.insert(device)
+            savedID = device.persistentModelID
             if !payload.password.isEmpty {
                 TerminalPasswordStore.savePassword(payload.password, credentialID: device.credentialID)
             }
         }
         do {
             try modelContext.save()
+            reloadSavedDevices()
+            if let savedID {
+                selectedDeviceID = savedID
+            }
         } catch {
             manager.logs += "\n[Database Save Error]: \(error.localizedDescription)\n"
         }
@@ -516,11 +524,22 @@ struct TerminalView: View {
         modelContext.delete(device)
         do {
             try modelContext.save()
+            reloadSavedDevices()
         } catch {
             manager.logs += "\n[Database Delete Error]: \(error.localizedDescription)\n"
         }
         if selectedDeviceID == device.persistentModelID {
             selectedDeviceID = nil
+        }
+    }
+    
+    private func reloadSavedDevices() {
+        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
+        do {
+            savedDevices = try modelContext.fetch(descriptor)
+        } catch {
+            savedDevices = []
+            manager.logs += "\n[Database Fetch Error]: \(error.localizedDescription)\n"
         }
     }
 }
