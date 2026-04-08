@@ -1566,7 +1566,7 @@ private struct TerminalSessionLogEntry: Identifiable, Codable, Equatable {
     }
 }
 
-private struct TerminalDeviceFormSheet: View {
+private struct TerminalSnippetLibrarySheet: View {
     @Environment(\.dismiss) private var dismiss
     
     let snippets: [TerminalSnippetEntry]
