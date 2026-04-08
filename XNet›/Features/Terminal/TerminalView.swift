@@ -439,6 +439,32 @@ struct TerminalView: View {
     private var selectedTheme: TerminalTheme {
         TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
     }
+    
+    private var filteredSnippets: [TerminalSnippetEntry] {
+        let term = snippetSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else {
+            return savedSnippets.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        return savedSnippets
+            .filter {
+                $0.title.localizedCaseInsensitiveContains(term)
+                || $0.command.localizedCaseInsensitiveContains(term)
+                || $0.notes.localizedCaseInsensitiveContains(term)
+            }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+    
+    private var filteredSessionLogs: [TerminalSessionLogEntry] {
+        let term = logSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return savedSessionLogs }
+        return savedSessionLogs.filter {
+            $0.title.localizedCaseInsensitiveContains(term)
+            || $0.host.localizedCaseInsensitiveContains(term)
+            || $0.username.localizedCaseInsensitiveContains(term)
+            || $0.connectionType.localizedCaseInsensitiveContains(term)
+            || $0.content.localizedCaseInsensitiveContains(term)
+        }
+    }
 
     private var tabBar: some View {
         HStack(spacing: 8) {
