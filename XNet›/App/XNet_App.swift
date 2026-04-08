@@ -14,7 +14,8 @@ struct XNet_App: App {
             NetBoxDevice.self,
             NetBoxVLANGroup.self,
             NetBoxVLAN.self,
-            TerminalDevice.self
+            TerminalDevice.self,
+            TerminalDeviceGroup.self
         ])
     }
 }

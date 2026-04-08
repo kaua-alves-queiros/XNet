@@ -84,3 +84,12 @@ final class TerminalDevice {
         self.credentialID = credentialID
     }
 }
+
+@Model
+final class TerminalDeviceGroup {
+    var name: String
+    
+    init(name: String = "Geral") {
+        self.name = name
+    }
+}

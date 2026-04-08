@@ -4,6 +4,7 @@ import SwiftData
 struct TerminalView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var savedDevices: [TerminalDeviceEntry] = []
+    @State private var savedGroups: [String] = ["Geral"]
     
     @State private var connectionType: ConnectionType = .ssh
     @State private var host: String = ""
@@ -14,6 +15,7 @@ struct TerminalView: View {
     @State private var availableSerialPorts: [String] = []
     @State private var selectedDeviceID: UUID?
     @State private var showingDeviceForm = false
+    @State private var showingGroupForm = false
     @State private var editingDevice: TerminalDeviceEntry?
     @State private var isApplyingSavedDevice = false
     @State private var isDeviceListVisible = true
@@ -54,6 +56,14 @@ struct TerminalView: View {
                             showingDeviceForm = true
                         } label: {
                             Label("Novo", systemImage: "plus")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        
+                        Button {
+                            showingGroupForm = true
+                        } label: {
+                            Label("Nova Pasta", systemImage: "folder.badge.plus")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -134,6 +144,15 @@ struct TerminalView: View {
                                 showingDeviceForm = true
                             } label: {
                                 Image(systemName: "plus")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                            
+                            Button {
+                                showingGroupForm = true
+                            } label: {
+                                Image(systemName: "folder.badge.plus")
                                     .font(.system(size: 11, weight: .semibold))
                             }
                             .buttonStyle(.bordered)
@@ -247,6 +266,7 @@ struct TerminalView: View {
         .navigationTitle("")
         .onAppear {
             reloadSavedDevices()
+            reloadSavedGroups()
             refreshExpandedGroups()
             if connectionType == .serial {
                 availableSerialPorts = manager.getAvailableSerialPorts()
@@ -266,8 +286,13 @@ struct TerminalView: View {
             refreshExpandedGroups()
         }
         .sheet(isPresented: $showingDeviceForm) {
-            TerminalDeviceFormSheet(deviceToEdit: editingDevice) { payload in
+            TerminalDeviceFormSheet(deviceToEdit: editingDevice, availableGroups: formGroupOptions) { payload in
                 saveDevice(payload)
+            }
+        }
+        .sheet(isPresented: $showingGroupForm) {
+            TerminalDeviceGroupFormSheet { name in
+                createGroup(named: name)
             }
         }
     }
@@ -454,10 +479,37 @@ struct TerminalView: View {
     
     private var groupedFilteredSavedDevices: [(group: String, devices: [TerminalDeviceEntry])] {
         let grouped = Dictionary(grouping: filteredSavedDevices) { normalizedGroupName($0.groupName) }
-        return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { key in
+        let term = deviceSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let groupNames = allGroupNames.filter { group in
+            if term.isEmpty { return true }
+            return group.localizedCaseInsensitiveContains(term) || !(grouped[group] ?? []).isEmpty
+        }
+        return groupNames.map { key in
             let devices = (grouped[key] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             return (group: key, devices: devices)
         }
+    }
+    
+    private var allGroupNames: [String] {
+        let merged = savedGroups + savedDevices.map(\.groupName) + ["Geral"]
+        var unique: [String] = []
+        for name in merged.map(normalizedGroupName(_:)) {
+            if !unique.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+                unique.append(name)
+            }
+        }
+        return unique.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+    
+    private var formGroupOptions: [String] {
+        var options = allGroupNames
+        if let editingDevice {
+            let normalized = normalizedGroupName(editingDevice.groupName)
+            if !options.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
+                options.append(normalized)
+            }
+        }
+        return options.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
     
     private func applyDevice(_ device: TerminalDeviceEntry) {
@@ -500,11 +552,13 @@ struct TerminalView: View {
     }
     
     private func saveDevice(_ payload: TerminalDevicePayload) {
+        let normalizedGroup = normalizedGroupName(payload.groupName)
+        ensureGroupExists(named: normalizedGroup)
         let credentialID = normalizedCredentialID(existing: editingDevice?.credentialID)
         let entry = TerminalDeviceEntry(
             id: editingDevice?.id ?? UUID(),
             name: payload.name,
-            groupName: payload.groupName,
+            groupName: normalizedGroup,
             connectionType: payload.connectionType,
             host: payload.host,
             port: payload.port,
@@ -599,6 +653,22 @@ struct TerminalView: View {
         refreshExpandedGroups()
     }
     
+    private func reloadSavedGroups() {
+        let descriptor = FetchDescriptor<TerminalDeviceGroup>(sortBy: [SortDescriptor(\.name, order: .forward)])
+        var names = ((try? modelContext.fetch(descriptor)) ?? []).map(\.name)
+        
+        if names.isEmpty,
+           let data = UserDefaults.standard.data(forKey: TerminalDeviceGroupStore.storageKey),
+           let cached = try? JSONDecoder().decode([String].self, from: data) {
+            names = cached
+        }
+        
+        let normalized = normalizedGroupCollection(names + savedDevices.map(\.groupName) + ["Geral"])
+        savedGroups = normalized
+        persistGroupCache()
+        syncGroupsToDatabase(normalized)
+    }
+    
     private func syncEntryToDatabase(_ entry: TerminalDeviceEntry) {
         let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
         do {
@@ -636,6 +706,12 @@ struct TerminalView: View {
         }
     }
     
+    private func persistGroupCache() {
+        if let data = try? JSONEncoder().encode(savedGroups) {
+            UserDefaults.standard.set(data, forKey: TerminalDeviceGroupStore.storageKey)
+        }
+    }
+    
     private func normalizedCredentialID(existing: String?) -> String {
         let trimmed = existing?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? UUID().uuidString : trimmed
@@ -644,6 +720,45 @@ struct TerminalView: View {
     private func normalizedGroupName(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Geral" : trimmed
+    }
+    
+    private func normalizedGroupCollection(_ values: [String]) -> [String] {
+        var unique: [String] = []
+        for value in values.map(normalizedGroupName(_:)) {
+            if !unique.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
+                unique.append(value)
+            }
+        }
+        return unique.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+    
+    private func ensureGroupExists(named name: String) {
+        let normalized = normalizedGroupName(name)
+        savedGroups = normalizedGroupCollection(savedGroups + [normalized])
+        persistGroupCache()
+        syncGroupsToDatabase([normalized])
+        refreshExpandedGroups()
+    }
+    
+    private func createGroup(named name: String) {
+        ensureGroupExists(named: name)
+    }
+    
+    private func syncGroupsToDatabase(_ groupNames: [String]) {
+        let normalized = normalizedGroupCollection(groupNames + ["Geral"])
+        let descriptor = FetchDescriptor<TerminalDeviceGroup>(sortBy: [SortDescriptor(\.name, order: .forward)])
+        do {
+            let rows = try modelContext.fetch(descriptor)
+            for groupName in normalized {
+                if rows.contains(where: { $0.name.caseInsensitiveCompare(groupName) == .orderedSame }) {
+                    continue
+                }
+                modelContext.insert(TerminalDeviceGroup(name: groupName))
+            }
+            try modelContext.save()
+        } catch {
+            manager.logs += "\n[Database Group Save Error]: \(error.localizedDescription)\n"
+        }
     }
     
     private func toggleGroup(_ group: String) {
@@ -894,6 +1009,7 @@ private struct TerminalDeviceFormSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     let deviceToEdit: TerminalDeviceEntry?
+    let availableGroups: [String]
     let onSave: (TerminalDevicePayload) -> Void
     
     @State private var name = ""
@@ -912,7 +1028,11 @@ private struct TerminalDeviceFormSheet: View {
             
             Form {
                 TextField("Nome", text: $name)
-                TextField("Grupo/Pasta", text: $groupName)
+                Picker("Grupo/Pasta", selection: $groupName) {
+                    ForEach(availableGroups, id: \.self) { group in
+                        Text(group).tag(group)
+                    }
+                }
                 Picker("Tipo", selection: $connectionType) {
                     ForEach(TerminalView.ConnectionType.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -955,6 +1075,9 @@ private struct TerminalDeviceFormSheet: View {
         .padding(18)
         .frame(width: 460)
         .onAppear {
+            if let firstGroup = availableGroups.first {
+                groupName = firstGroup
+            }
             guard let device = deviceToEdit else { return }
             name = device.name
             connectionType = TerminalView.ConnectionType(rawValue: device.connectionType) ?? .ssh
@@ -979,6 +1102,40 @@ private struct TerminalDeviceFormSheet: View {
     }
 }
 
+private struct TerminalDeviceGroupFormSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    
+    let onSave: (String) -> Void
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Nova Pasta")
+                .font(.title3.bold())
+            
+            Form {
+                TextField("Nome da pasta", text: $name)
+            }
+            .formStyle(.grouped)
+            
+            HStack {
+                Spacer()
+                Button("Cancelar", role: .cancel) {
+                    dismiss()
+                }
+                Button("Salvar") {
+                    onSave(name)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(18)
+        .frame(width: 360)
+    }
+}
+
 #Preview {
     TerminalView()
 }
@@ -998,4 +1155,8 @@ private enum TerminalPasswordStore {
     static func deletePassword(credentialID: String) {
         UserDefaults.standard.removeObject(forKey: keyPrefix + credentialID)
     }
+}
+
+private enum TerminalDeviceGroupStore {
+    static let storageKey = "terminal.group.cache.v1"
 }
