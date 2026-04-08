@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Security
 
 struct TerminalView: View {
     @Environment(\.modelContext) private var modelContext
@@ -9,12 +10,14 @@ struct TerminalView: View {
     @State private var host: String = ""
     @State private var port: String = "22"
     @State private var username: String = ""
+    @State private var savedPassword: String = ""
     @State private var manager = TerminalConnectionManager()
     @State private var availableSerialPorts: [String] = []
     @State private var selectedDeviceID: PersistentIdentifier?
     @State private var showingDeviceForm = false
     @State private var editingDevice: TerminalDevice?
     @State private var isApplyingSavedDevice = false
+    @State private var isDeviceListVisible = true
     
     enum ConnectionType: String, CaseIterable, Identifiable {
         case ssh = "SSH", telnet = "Telnet", serial = "Serial"
@@ -64,6 +67,13 @@ struct TerminalView: View {
                         .buttonStyle(.bordered)
                         .disabled(selectedDevice == nil)
                         
+                        Button {
+                            isDeviceListVisible.toggle()
+                        } label: {
+                            Label(isDeviceListVisible ? "Ocultar Lista" : "Mostrar Lista", systemImage: isDeviceListVisible ? "sidebar.left" : "sidebar.right")
+                        }
+                        .buttonStyle(.bordered)
+                        
                         Picker("", selection: $connectionType) {
                             ForEach(ConnectionType.allCases) { Text($0.rawValue).tag($0) }
                         }
@@ -103,7 +113,7 @@ struct TerminalView: View {
                     
                     Spacer(minLength: 0)
                     
-                    Button(action: { host = ""; username = ""; manager.logs = "" }) {
+                    Button(action: { host = ""; username = ""; savedPassword = ""; manager.logs = "" }) {
                         Image(systemName: "broom.fill")
                             .foregroundStyle(.secondary)
                             .font(.system(size: 14))
@@ -120,53 +130,55 @@ struct TerminalView: View {
             Divider()
                 
             HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    HStack {
-                        Text("Dispositivos Salvos")
-                            .font(.headline)
-                        Spacer()
+                if isDeviceListVisible {
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text("Dispositivos Salvos")
+                                .font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        
+                        Divider()
+                        
+                        List(savedDevices, selection: $selectedDeviceID) { device in
+                            Button {
+                                selectedDeviceID = device.persistentModelID
+                                applyDevice(device)
+                                connectFromDevice(device)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(device.name)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text("\(device.connectionType) • \(device.host):\(device.port)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Editar") {
+                                    selectedDeviceID = device.persistentModelID
+                                    editingDevice = device
+                                    showingDeviceForm = true
+                                }
+                                Button("Excluir", role: .destructive) {
+                                    deleteDevice(device)
+                                }
+                            }
+                        }
+                        .listStyle(.plain)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    .frame(width: 300)
+                    .background(Color(NSColor.controlBackgroundColor))
                     
                     Divider()
-                    
-                    List(savedDevices, selection: $selectedDeviceID) { device in
-                        Button {
-                            selectedDeviceID = device.persistentModelID
-                            applyDevice(device)
-                            connectFromDevice(device)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(device.name)
-                                    .font(.system(size: 13, weight: .semibold))
-                                Text("\(device.connectionType) • \(device.host):\(device.port)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Editar") {
-                                selectedDeviceID = device.persistentModelID
-                                editingDevice = device
-                                showingDeviceForm = true
-                            }
-                            Button("Excluir", role: .destructive) {
-                                deleteDevice(device)
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
                 }
-                .frame(width: 300)
-                .background(Color(NSColor.controlBackgroundColor))
-                
-                Divider()
-                
                 ZStack {
                     Color.black
+                    
                     
                     if manager.isConnected {
                         InteractiveTerminalTextView(text: $manager.logs) { input in
@@ -229,6 +241,18 @@ struct TerminalView: View {
                     TextField("User", text: $username)
                         .textFieldStyle(.plain)
                         .frame(width: 80)
+                }
+            }
+            
+            if connectionType != .serial {
+                Divider().frame(height: 12)
+                HStack(spacing: 4) {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10))
+                    SecureField("Senha", text: $savedPassword)
+                        .textFieldStyle(.plain)
+                        .frame(width: 100)
                 }
             }
         }
@@ -306,8 +330,10 @@ struct TerminalView: View {
         manager.logs = ""
         switch connectionType {
         case .ssh:
+            manager.setSSHPassword(savedPassword)
             manager.connectSSH(host: host, port: port, user: username)
         case .telnet:
+            manager.setTelnetPassword(savedPassword)
             manager.connectTelnet(host: host, port: port)
         case .serial:
             if let baud = Int(port) {
@@ -327,6 +353,7 @@ struct TerminalView: View {
         host = device.host
         port = device.port
         username = device.username
+        savedPassword = TerminalPasswordStore.readPassword(credentialID: device.credentialID) ?? ""
         if connectionType == .serial {
             availableSerialPorts = manager.getAvailableSerialPorts()
             if !availableSerialPorts.contains(host), !host.isEmpty {
@@ -356,6 +383,11 @@ struct TerminalView: View {
             existing.port = payload.port
             existing.username = payload.username
             existing.notes = payload.notes
+            if payload.password.isEmpty {
+                TerminalPasswordStore.deletePassword(credentialID: existing.credentialID)
+            } else {
+                TerminalPasswordStore.savePassword(payload.password, credentialID: existing.credentialID)
+            }
         } else {
             let device = TerminalDevice(
                 name: payload.name,
@@ -366,12 +398,16 @@ struct TerminalView: View {
                 notes: payload.notes
             )
             modelContext.insert(device)
+            if !payload.password.isEmpty {
+                TerminalPasswordStore.savePassword(payload.password, credentialID: device.credentialID)
+            }
         }
         try? modelContext.save()
         editingDevice = nil
     }
     
     private func deleteDevice(_ device: TerminalDevice) {
+        TerminalPasswordStore.deletePassword(credentialID: device.credentialID)
         modelContext.delete(device)
         try? modelContext.save()
         if selectedDeviceID == device.persistentModelID {
@@ -386,6 +422,7 @@ private struct TerminalDevicePayload {
     var host: String
     var port: String
     var username: String
+    var password: String
     var notes: String
 }
 
@@ -400,6 +437,7 @@ private struct TerminalDeviceFormSheet: View {
     @State private var host = ""
     @State private var port = "22"
     @State private var username = ""
+    @State private var password = ""
     @State private var notes = ""
     
     var body: some View {
@@ -416,6 +454,9 @@ private struct TerminalDeviceFormSheet: View {
                 TextField(connectionType == .serial ? "Baud rate" : "Porta", text: $port)
                 if connectionType == .ssh {
                     TextField("Usuário", text: $username)
+                }
+                if connectionType != .serial {
+                    SecureField("Senha", text: $password)
                 }
                 TextField("Notas", text: $notes)
             }
@@ -434,6 +475,7 @@ private struct TerminalDeviceFormSheet: View {
                             host: host,
                             port: port,
                             username: username,
+                            password: password,
                             notes: notes
                         )
                     )
@@ -452,6 +494,7 @@ private struct TerminalDeviceFormSheet: View {
             host = device.host
             port = device.port
             username = device.username
+            password = TerminalPasswordStore.readPassword(credentialID: device.credentialID) ?? ""
             notes = device.notes
         }
         .onChange(of: connectionType) { _, value in
@@ -470,4 +513,49 @@ private struct TerminalDeviceFormSheet: View {
 
 #Preview {
     TerminalView()
+}
+
+private enum TerminalPasswordStore {
+    private static let service = "br.com.myrouter.xnet.terminal.password"
+    
+    static func savePassword(_ password: String, credentialID: String) {
+        guard let data = password.data(using: .utf8) else { return }
+        deletePassword(credentialID: credentialID)
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: credentialID,
+            kSecValueData as String: data
+        ]
+        SecItemAdd(query as CFDictionary, nil)
+    }
+    
+    static func readPassword(credentialID: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: credentialID,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let password = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return password
+    }
+    
+    static func deletePassword(credentialID: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: credentialID
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
 }

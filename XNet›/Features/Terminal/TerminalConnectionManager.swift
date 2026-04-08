@@ -22,6 +22,10 @@ class TerminalConnectionManager {
     private var serialFileDescriptor: Int32 = -1
     private var isReadingSerial: Bool = false
     private let serialQueue = DispatchQueue(label: "com.xnet.serial", qos: .userInitiated)
+    private var autoSSHPassword: String?
+    private var autoTelnetPassword: String?
+    private var didSendSSHPassword = false
+    private var didSendTelnetPassword = false
     
     func getAvailableSerialPorts() -> [String] {
         guard let items = try? FileManager.default.contentsOfDirectory(atPath: "/dev") else { return [] }
@@ -30,6 +34,7 @@ class TerminalConnectionManager {
     
     func connectSSH(host: String, port: String, user: String) {
         logs += "Starting SSH session...\n"
+        didSendSSHPassword = false
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
@@ -96,6 +101,7 @@ class TerminalConnectionManager {
     
     func connectTelnet(host: String, port: String) {
         logs += "Starting Telnet session...\n"
+        didSendTelnetPassword = false
         
         let hostEndpoint = NWEndpoint.Host(host)
         guard let portEndpoint = NWEndpoint.Port(port) else {
@@ -210,6 +216,28 @@ class TerminalConnectionManager {
             }
         }
         self.logs = current
+        
+        if let process = sshProcess,
+           process.isRunning,
+           !didSendSSHPassword,
+           let password = autoSSHPassword,
+           !password.isEmpty,
+           containsPasswordPrompt(newString) {
+            didSendSSHPassword = true
+            sendRaw(password + "\n")
+        } else if telnetConnection?.state == .ready,
+                  !didSendTelnetPassword,
+                  let password = autoTelnetPassword,
+                  !password.isEmpty,
+                  containsPasswordPrompt(newString) {
+            didSendTelnetPassword = true
+            sendRaw(password + "\n")
+        }
+    }
+
+    private func containsPasswordPrompt(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return lower.contains("password:") || lower.contains("password ")
     }
 
     private func filterTelnetCommands(from data: Data) -> Data {
@@ -301,6 +329,16 @@ class TerminalConnectionManager {
         sendRaw(command + "\n")
     }
     
+    func setSSHPassword(_ password: String) {
+        autoSSHPassword = password
+        didSendSSHPassword = false
+    }
+    
+    func setTelnetPassword(_ password: String) {
+        autoTelnetPassword = password
+        didSendTelnetPassword = false
+    }
+    
     func disconnect() {
         if let process = sshProcess, process.isRunning {
             process.terminate()
@@ -315,6 +353,9 @@ class TerminalConnectionManager {
             close(serialFileDescriptor)
             serialFileDescriptor = -1
         }
+        
+        didSendSSHPassword = false
+        didSendTelnetPassword = false
         
         isConnected = false
     }

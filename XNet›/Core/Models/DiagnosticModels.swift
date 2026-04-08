@@ -70,13 +70,15 @@ final class TerminalDevice {
     var port: String
     var username: String
     var notes: String
+    var credentialID: String
     
-    init(name: String, connectionType: String = "SSH", host: String, port: String, username: String = "", notes: String = "") {
+    init(name: String, connectionType: String = "SSH", host: String, port: String, username: String = "", notes: String = "", credentialID: String = UUID().uuidString) {
         self.name = name
         self.connectionType = connectionType
         self.host = host
         self.port = port
         self.username = username
         self.notes = notes
+        self.credentialID = credentialID
     }
 }
