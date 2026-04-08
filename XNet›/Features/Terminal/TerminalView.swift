@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct TerminalView: View {
     @Environment(\.modelContext) private var modelContext
@@ -23,6 +24,11 @@ struct TerminalView: View {
     @State private var selectedTabID: UUID? = nil
     @State private var deviceSearch = ""
     @State private var expandedGroups: Set<String> = []
+    @State private var showingDeviceExporter = false
+    @State private var showingDeviceImporter = false
+    @State private var exportDocument = TerminalDeviceRegistryDocument()
+    @State private var exportFilename = "xnet-dispositivos.json"
+    @State private var importExportMessage: String?
     
     enum ConnectionType: String, CaseIterable, Identifiable {
         case ssh = "SSH", telnet = "Telnet", serial = "Serial"
@@ -66,6 +72,19 @@ struct TerminalView: View {
                             Label("Nova Pasta", systemImage: "folder.badge.plus")
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        
+                        Menu {
+                            Button("Exportar Cadastros") {
+                                prepareDeviceExport()
+                            }
+                            Button("Importar Cadastros") {
+                                showingDeviceImporter = true
+                            }
+                        } label: {
+                            Label("Cadastro", systemImage: "arrow.up.arrow.down.square")
+                        }
+                        .menuStyle(.borderedButton)
                         .controlSize(.small)
                         
                         Button {
@@ -294,6 +313,34 @@ struct TerminalView: View {
             TerminalDeviceGroupFormSheet { name in
                 createGroup(named: name)
             }
+        }
+        .fileExporter(
+            isPresented: $showingDeviceExporter,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: exportFilename
+        ) { result in
+            switch result {
+            case .success:
+                importExportMessage = "Cadastros exportados com sucesso."
+            case .failure(let error):
+                importExportMessage = "Falha ao exportar: \(error.localizedDescription)"
+            }
+        }
+        .fileImporter(
+            isPresented: $showingDeviceImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleDeviceImport(result)
+        }
+        .alert("Cadastro de Dispositivos", isPresented: Binding(
+            get: { importExportMessage != nil },
+            set: { if !$0 { importExportMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(importExportMessage ?? "")
         }
     }
 
@@ -744,6 +791,123 @@ struct TerminalView: View {
         ensureGroupExists(named: name)
     }
     
+    private func prepareDeviceExport() {
+        let payload = TerminalDeviceRegistryPayload(
+            version: 1,
+            exportedAt: Date(),
+            includesPasswords: false,
+            groups: allGroupNames,
+            devices: savedDevices.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        )
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let data = try encoder.encode(payload)
+            exportDocument = TerminalDeviceRegistryDocument(text: String(decoding: data, as: UTF8.self))
+            let formatter = ISO8601DateFormatter()
+            let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            exportFilename = "xnet-dispositivos-\(timestamp).json"
+            showingDeviceExporter = true
+        } catch {
+            importExportMessage = "Falha ao preparar exportação: \(error.localizedDescription)"
+        }
+    }
+    
+    private func handleDeviceImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let hasAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            
+            do {
+                let data = try Data(contentsOf: url)
+                try importRegistry(from: data)
+            } catch {
+                importExportMessage = "Falha ao importar: \(error.localizedDescription)"
+            }
+        case .failure(let error):
+            importExportMessage = "Falha ao importar: \(error.localizedDescription)"
+        }
+    }
+    
+    private func importRegistry(from data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payload = try decoder.decode(TerminalDeviceRegistryPayload.self, from: data)
+        
+        for group in payload.groups {
+            ensureGroupExists(named: group)
+        }
+        
+        var mergedDevices = savedDevices
+        
+        for imported in payload.devices {
+            let normalizedImported = TerminalDeviceEntry(
+                id: imported.id,
+                name: imported.name,
+                groupName: normalizedGroupName(imported.groupName),
+                connectionType: imported.connectionType,
+                host: imported.host,
+                port: imported.port,
+                username: imported.username,
+                notes: imported.notes,
+                credentialID: normalizedCredentialID(existing: imported.credentialID)
+            )
+            
+            ensureGroupExists(named: normalizedImported.groupName)
+            
+            if let existingIndex = mergedDevices.firstIndex(where: { matchesImportedEntry($0, normalizedImported) }) {
+                let existing = mergedDevices[existingIndex]
+                let merged = TerminalDeviceEntry(
+                    id: existing.id,
+                    name: normalizedImported.name,
+                    groupName: normalizedImported.groupName,
+                    connectionType: normalizedImported.connectionType,
+                    host: normalizedImported.host,
+                    port: normalizedImported.port,
+                    username: normalizedImported.username,
+                    notes: normalizedImported.notes,
+                    credentialID: existing.credentialID
+                )
+                mergedDevices[existingIndex] = merged
+                syncEntryToDatabase(merged)
+            } else {
+                mergedDevices.append(normalizedImported)
+                syncEntryToDatabase(normalizedImported)
+            }
+        }
+        
+        savedDevices = mergedDevices.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        persistSavedDevicesCache()
+        reloadSavedGroups()
+        refreshExpandedGroups()
+        NotificationCenter.default.post(name: Notification.Name("TerminalDevicesUpdated"), object: nil)
+        
+        let importedCount = payload.devices.count
+        importExportMessage = "Importação concluída. \(importedCount) dispositivo(s) processado(s). Senhas não fazem parte do arquivo por segurança."
+    }
+    
+    private func matchesImportedEntry(_ existing: TerminalDeviceEntry, _ imported: TerminalDeviceEntry) -> Bool {
+        if !existing.credentialID.isEmpty,
+           !imported.credentialID.isEmpty,
+           existing.credentialID == imported.credentialID {
+            return true
+        }
+        
+        return existing.connectionType.caseInsensitiveCompare(imported.connectionType) == .orderedSame
+        && existing.host.caseInsensitiveCompare(imported.host) == .orderedSame
+        && existing.port == imported.port
+        && existing.username.caseInsensitiveCompare(imported.username) == .orderedSame
+    }
+    
     private func syncGroupsToDatabase(_ groupNames: [String]) {
         let normalized = normalizedGroupCollection(groupNames + ["Geral"])
         let descriptor = FetchDescriptor<TerminalDeviceGroup>(sortBy: [SortDescriptor(\.name, order: .forward)])
@@ -1159,4 +1323,34 @@ private enum TerminalPasswordStore {
 
 private enum TerminalDeviceGroupStore {
     static let storageKey = "terminal.group.cache.v1"
+}
+
+private struct TerminalDeviceRegistryPayload: Codable {
+    let version: Int
+    let exportedAt: Date
+    let includesPasswords: Bool
+    let groups: [String]
+    let devices: [TerminalDeviceEntry]
+}
+
+private struct TerminalDeviceRegistryDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    
+    var text: String
+    
+    init(text: String = "") {
+        self.text = text
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let text = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.text = text
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
 }
