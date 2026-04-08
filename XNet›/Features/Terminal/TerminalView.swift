@@ -18,6 +18,8 @@ struct TerminalView: View {
     @State private var editingDevice: TerminalDevice?
     @State private var isApplyingSavedDevice = false
     @State private var isDeviceListVisible = true
+    @State private var tabs: [TerminalTabItem] = [TerminalTabItem(name: "Aba 1")]
+    @State private var selectedTabID: UUID? = nil
     
     enum ConnectionType: String, CaseIterable, Identifiable {
         case ssh = "SSH", telnet = "Telnet", serial = "Serial"
@@ -26,8 +28,9 @@ struct TerminalView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Premium Unified Header
             VStack(alignment: .leading, spacing: 20) {
+                tabBar
+                
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Shell Terminal")
@@ -192,6 +195,10 @@ struct TerminalView: View {
         }
         .navigationTitle("")
         .onAppear {
+            if selectedTabID == nil, let first = tabs.first {
+                selectedTabID = first.id
+                loadTab(first)
+            }
             if connectionType == .serial {
                 availableSerialPorts = manager.getAvailableSerialPorts()
             }
@@ -200,7 +207,12 @@ struct TerminalView: View {
             if !isApplyingSavedDevice {
                 updateDefaultPort(for: newValue)
             }
+            saveCurrentTabState()
         }
+        .onChange(of: host) { _, _ in saveCurrentTabState() }
+        .onChange(of: port) { _, _ in saveCurrentTabState() }
+        .onChange(of: username) { _, _ in saveCurrentTabState() }
+        .onChange(of: savedPassword) { _, _ in saveCurrentTabState() }
         .sheet(isPresented: $showingDeviceForm) {
             TerminalDeviceFormSheet(deviceToEdit: editingDevice) { payload in
                 saveDevice(payload)
@@ -208,7 +220,53 @@ struct TerminalView: View {
         }
     }
 
-    // MARK: - UI Components
+    private var tabBar: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tabs) { tab in
+                        HStack(spacing: 6) {
+                            Button {
+                                saveCurrentTabState()
+                                selectedTabID = tab.id
+                                loadTab(tab)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(tab.manager.isConnected ? Color.green : Color.secondary.opacity(0.45))
+                                        .frame(width: 7, height: 7)
+                                    Text(tab.displayName)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selectedTabID == tab.id ? Color.blue.opacity(0.22) : Color.secondary.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if tabs.count > 1 {
+                                Button {
+                                    closeTab(tab.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Button {
+                addTab()
+            } label: {
+                Label("Nova Aba", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
+        }
+    }
     
     private var networkFieldsCompact: some View {
         HStack(spacing: 16) {
@@ -305,7 +363,50 @@ struct TerminalView: View {
         }
     }
 
-    // MARK: - Logic
+    private func saveCurrentTabState() {
+        guard let selectedTabID, let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        tabs[index].connectionType = connectionType
+        tabs[index].host = host
+        tabs[index].port = port
+        tabs[index].username = username
+        tabs[index].password = savedPassword
+        tabs[index].availableSerialPorts = availableSerialPorts
+        tabs[index].manager = manager
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedHost.isEmpty {
+            tabs[index].name = trimmedHost
+        }
+    }
+    
+    private func loadTab(_ tab: TerminalTabItem) {
+        connectionType = tab.connectionType
+        host = tab.host
+        port = tab.port
+        username = tab.username
+        savedPassword = tab.password
+        availableSerialPorts = tab.availableSerialPorts
+        manager = tab.manager
+    }
+    
+    private func addTab() {
+        saveCurrentTabState()
+        let tab = TerminalTabItem(name: "Aba \(tabs.count + 1)")
+        tabs.append(tab)
+        selectedTabID = tab.id
+        loadTab(tab)
+    }
+    
+    private func closeTab(_ id: UUID) {
+        guard tabs.count > 1 else { return }
+        saveCurrentTabState()
+        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+        tabs.remove(at: index)
+        if selectedTabID == id {
+            let fallback = tabs[min(index, tabs.count - 1)]
+            selectedTabID = fallback.id
+            loadTab(fallback)
+        }
+    }
     
     private func updateDefaultPort(for type: ConnectionType) {
         switch type {
@@ -402,14 +503,22 @@ struct TerminalView: View {
                 TerminalPasswordStore.savePassword(payload.password, credentialID: device.credentialID)
             }
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            manager.logs += "\n[Database Save Error]: \(error.localizedDescription)\n"
+        }
         editingDevice = nil
     }
     
     private func deleteDevice(_ device: TerminalDevice) {
         TerminalPasswordStore.deletePassword(credentialID: device.credentialID)
         modelContext.delete(device)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            manager.logs += "\n[Database Delete Error]: \(error.localizedDescription)\n"
+        }
         if selectedDeviceID == device.persistentModelID {
             selectedDeviceID = nil
         }
@@ -424,6 +533,23 @@ private struct TerminalDevicePayload {
     var username: String
     var password: String
     var notes: String
+}
+
+private struct TerminalTabItem: Identifiable {
+    let id = UUID()
+    var name: String
+    var connectionType: TerminalView.ConnectionType = .ssh
+    var host: String = ""
+    var port: String = "22"
+    var username: String = ""
+    var password: String = ""
+    var availableSerialPorts: [String] = []
+    var manager: TerminalConnectionManager = TerminalConnectionManager()
+    
+    var displayName: String {
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedHost.isEmpty ? name : trimmedHost
+    }
 }
 
 private struct TerminalDeviceFormSheet: View {
