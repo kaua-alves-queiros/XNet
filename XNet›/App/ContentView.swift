@@ -106,7 +106,7 @@ struct ContentView: View {
                                         allVLANGroups: allVLANGroups
                                      )
                                 } else {
-                                    NetBoxDashboardView(theme: selectedTheme)
+                                    NetBoxView()
                                 }
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -270,31 +270,6 @@ struct NetBoxSubNav: View {
     }
 }
 
-struct NetBoxDashboardView: View {
-    let theme: TerminalTheme
-    
-    var body: some View {
-        VStack {
-            Image(systemName: "square.stack.3d.up")
-                .font(.system(size: 60))
-                .foregroundStyle(theme.accentColor.gradient)
-            Text("NetBox Core")
-                .font(.title)
-                .bold()
-                .foregroundStyle(theme.foregroundColor)
-            Text("Select a category to manage your infrastructure.")
-                .foregroundStyle(theme.mutedColor)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [theme.chromeTopColor, theme.chromeBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-    }
-}
 
 struct NetBoxDetailView: View {
     let item: NetBoxView.NetBoxNavigationItem

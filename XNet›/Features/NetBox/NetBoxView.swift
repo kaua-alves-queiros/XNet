@@ -14,6 +14,7 @@ struct NetBoxView: View {
     @Query(sort: \NetBoxPrefix.cidr) private var allPrefixes: [NetBoxPrefix]
     
     @State private var showingEraseConfirmation = false
+    @State private var showingQuickProvision = false
     
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     private var selectedTheme: TerminalTheme {
@@ -31,6 +32,33 @@ struct NetBoxView: View {
                     AssetCard(title: "Deployment Sites", count: allSites.count, icon: "building.2.fill", color: .purple, theme: selectedTheme)
                     AssetCard(title: "Total Devices", count: allDevices.count, icon: "cpu.fill", color: .blue, theme: selectedTheme)
                     AssetCard(title: "IP Prefixes", count: allPrefixes.count, icon: "network", color: .green, theme: selectedTheme)
+                }
+                
+                // Rapid Deployment Workflow
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Fast Provisioning")
+                        .font(.title3)
+                        .bold()
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    
+                    Button {
+                        showingQuickProvision = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "bolt.fill")
+                            Text("Deploy Office / Branch Network")
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(selectedTheme.accentColor.opacity(0.15))
+                        .foregroundStyle(selectedTheme.accentColor)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(selectedTheme.accentColor.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 
                 // Detailed Breakdown Section
@@ -99,16 +127,21 @@ struct NetBoxView: View {
         } message: {
             Text("This will permanently delete all NetBox objects (Sites, Devices, VLANs, Prefixes, and IPs) from your local SwiftData store. Terminal snippets and SSH connections will NOT be affected.")
         }
+        .sheet(isPresented: $showingQuickProvision) {
+            QuickProvisionSheet(isPresented: $showingQuickProvision)
+        }
     }
     
     private func purgeNetBox() {
         do {
-            try modelContext.delete(model: NetBoxSite.self)
-            try modelContext.delete(model: NetBoxVLANGroup.self)
-            try modelContext.delete(model: NetBoxVLAN.self)
-            try modelContext.delete(model: NetBoxPrefix.self)
-            try modelContext.delete(model: NetBoxDevice.self)
-            try modelContext.delete(model: NetBoxIP.self)
+            allSites.forEach { modelContext.delete($0) }
+            allDevices.forEach { modelContext.delete($0) }
+            allPrefixes.forEach { modelContext.delete($0) }
+            
+            if let vlans = try? modelContext.fetch(FetchDescriptor<NetBoxVLAN>()) { vlans.forEach { modelContext.delete($0) } }
+            if let groups = try? modelContext.fetch(FetchDescriptor<NetBoxVLANGroup>()) { groups.forEach { modelContext.delete($0) } }
+            if let ips = try? modelContext.fetch(FetchDescriptor<NetBoxIP>()) { ips.forEach { modelContext.delete($0) } }
+            
             try modelContext.save()
         } catch {
             print("Failed to purge NetBox env: \(error)")
