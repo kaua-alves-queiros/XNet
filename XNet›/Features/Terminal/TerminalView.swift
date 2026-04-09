@@ -136,16 +136,6 @@ struct TerminalView: View {
                 
             HStack(spacing: 8) {
                 Group {
-                    Button {
-                        editingDevice = nil
-                        showingDeviceForm = true
-                    } label: { Image(systemName: "plus") }.help("Novo Dispositivo")
-                    
-                    Button {
-                        showingGroupForm = true
-                    } label: { Image(systemName: "folder.badge.plus") }.help("Nova Pasta")
-                    
-                    Divider().frame(height: 16).padding(.horizontal, 4)
                     
                     Button {
                         isDeviceListVisible.toggle()
