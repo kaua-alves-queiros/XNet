@@ -114,7 +114,9 @@ struct TerminalView: View {
     
     private var topBarSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            tabBar
+            if tabs.count > 1 {
+                tabBar
+            }
             
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -147,6 +149,9 @@ struct TerminalView: View {
                 Spacer()
                 
                 Group {
+                    if tabs.count <= 1 {
+                        Button(action: addTab) { Image(systemName: "plus") }.help("Nova Aba")
+                    }
                     Button {
                         editingSnippet = nil
                         showingSnippetLibrary = true
