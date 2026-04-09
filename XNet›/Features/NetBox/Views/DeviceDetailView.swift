@@ -6,46 +6,111 @@ struct DeviceDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false; @State private var editName = ""
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+    
     var body: some View {
         List {
-            Section("Machine Assets") {
+            Section {
                 LabeledContent("Hostname", value: device.name)
                 LabeledContent("Platform", value: device.deviceType)
                 LabeledContent("Physical Location", value: device.site?.name ?? "Global Space")
+            } header: {
+                Text("Machine Assets")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
             
-            Section("IP Documented Interfaces") {
-                 if device.assignedIPs.isEmpty { Text("No active IP documentation.").italic().foregroundStyle(.secondary) }
+            Section {
+                 if device.assignedIPs.isEmpty { 
+                     Text("No active IP documentation.")
+                         .italic()
+                         .foregroundStyle(selectedTheme.mutedColor) 
+                 }
                  ForEach(device.assignedIPs) { ip in
                       HStack {
                            Text(ip.address).font(.system(.body, design: .monospaced, weight: .bold))
+                               .foregroundStyle(selectedTheme.foregroundColor)
                            Spacer()
-                           Text(ip.interfaceLabel ?? "LAN").font(.caption).foregroundStyle(.blue).padding(2).background(Color.blue.opacity(0.1)).cornerRadius(4)
+                           Text(ip.interfaceLabel ?? "LAN").font(.caption).foregroundStyle(selectedTheme.accentColor).padding(4).background(selectedTheme.accentColor.opacity(0.1)).cornerRadius(4)
                       }
                  }
+            } header: {
+                Text("IP Documented Interfaces")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
 
             if !device.notes.isEmpty {
-                Section("Diagnostic & Config Notes") {
+                Section {
                     Text(device.notes)
                         .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.foregroundColor.opacity(0.7))
                         .padding(.vertical, 4)
+                } header: {
+                    Text("Diagnostic & Config Notes")
+                        .foregroundStyle(selectedTheme.mutedColor)
+                        .font(.caption)
+                        .bold()
                 }
             }
             
-            Section("Audit Actions") {
-                Button("Edit Hostname") { editName = device.name; isEditing = true }.foregroundStyle(.blue)
+            Section {
+                Button("Edit Hostname") { editName = device.name; isEditing = true }
+                    .foregroundStyle(selectedTheme.accentColor)
                 Button(role: .destructive) { modelContext.delete(device); try? modelContext.save() } label: { Label("Decommission Device", systemImage: "trash") }
+                    .foregroundStyle(.red)
+            } header: {
+                Text("Audit Actions")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .top,
+                    endPoint: .bottom
+            )
+        )
         .navigationTitle(device.name)
         .sheet(isPresented: $isEditing) {
              VStack(spacing: 20) {
                   Text("Update Machine Asset").font(.headline)
-                  Form { TextField("Hostname", text: $editName) }
-                  HStack { Button("Cancel") { isEditing = false }; Spacer(); Button("Confirm") { device.name = editName; try? modelContext.save(); isEditing = false }.buttonStyle(.borderedProminent) }
-             }.padding().frame(width: 320)
+                      .foregroundStyle(selectedTheme.foregroundColor)
+                  Form { 
+                      TextField("Hostname", text: $editName) 
+                          .textFieldStyle(.roundedBorder)
+                  }
+                  HStack { 
+                      Button("Cancel") { isEditing = false }
+                      Spacer()
+                      Button("Confirm") { 
+                          device.name = editName; 
+                          try? modelContext.save(); 
+                          isEditing = false 
+                      }
+                      .buttonStyle(.borderedProminent)
+                      .tint(selectedTheme.accentColor)
+                  }
+             }
+             .padding()
+             .frame(width: 320)
+             .background(selectedTheme.backgroundColor)
+             .cornerRadius(12)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
         }
     }
 }
