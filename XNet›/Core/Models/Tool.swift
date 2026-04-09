@@ -14,6 +14,8 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
     case ipScan, portScan, ping, traceroute
     // Remoto (Remote Access)
     case terminal, ftp, subnetCalculator
+    // Configurações
+    case settings
     
     var id: String { self.rawValue }
     
@@ -28,6 +30,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .ftp: return "FTP"
         case .subnetCalculator: return "Subnet Calculator"
         case .netbox: return "NetBox"
+        case .settings: return "Configurações"
         }
     }
     
@@ -42,7 +45,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .ftp: return "arrow.up.doc"
         case .subnetCalculator: return "plus.forwardslash.minus"
         case .netbox: return "square.stack.3d.up"
+        case .settings: return "gearshape.fill"
         }
     }
 }
-

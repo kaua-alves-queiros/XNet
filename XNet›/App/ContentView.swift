@@ -50,6 +50,10 @@ struct ContentView: View {
                         SidebarNavLink(tool: .ftp, selection: $selection, theme: selectedTheme)
                         SidebarNavLink(tool: .subnetCalculator, selection: $selection, theme: selectedTheme)
                     }
+
+                    SidebarSection(title: "Configuração", icon: "gearshape.fill", color: .gray, theme: selectedTheme) {
+                        SidebarNavLink(tool: .settings, selection: $selection, theme: selectedTheme)
+                    }
                 }
             }
             .listStyle(.sidebar)

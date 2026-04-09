@@ -29,6 +29,8 @@ struct DetailContentView: View {
             SubnetCalculatorView()
         case .netbox:
             NetBoxView()
+        case .settings:
+            SettingsView()
         }
     }
 }

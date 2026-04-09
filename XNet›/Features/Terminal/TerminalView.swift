@@ -30,7 +30,6 @@ struct TerminalView: View {
     @State private var exportFilename = "xnet-dispositivos.json"
     @State private var importExportMessage: String?
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    @State private var isThemeSelectorExpanded = false
     @State private var savedSnippets: [TerminalSnippetEntry] = []
     @State private var savedSessionLogs: [TerminalSessionLogEntry] = []
     @State private var snippetSearch = ""
@@ -128,15 +127,6 @@ struct TerminalView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         
-                        Button {
-                            withAnimation(.spring(duration: 0.28)) {
-                                isThemeSelectorExpanded.toggle()
-                            }
-                        } label: {
-                            Label(isThemeSelectorExpanded ? "Ocultar Temas" : "Temas", systemImage: "paintpalette")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
                         
                         Button {
                             editingSnippet = nil
@@ -175,10 +165,6 @@ struct TerminalView: View {
                     }
                 }
                 
-                if isThemeSelectorExpanded {
-                    themeSelector
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
             }
             .padding(.horizontal, 28)
             .padding(.top, 32)
@@ -358,8 +344,12 @@ struct TerminalView: View {
         .onChange(of: deviceSearch) { _, _ in
             refreshExpandedGroups()
         }
-        .onChange(of: selectedThemeID) { _, newValue in
-            TerminalThemeStore.saveThemeID(newValue)
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
         }
         .onDisappear {
             persistLogIfNeeded(forTabID: selectedTabID)
@@ -526,101 +516,6 @@ struct TerminalView: View {
         )
     }
 
-    private var themeSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Temas do Terminal", systemImage: "paintpalette")
-                    .font(.headline)
-                    .foregroundStyle(selectedTheme.foregroundColor)
-                Spacer()
-                Text(selectedTheme.displayName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(selectedTheme.accentColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.12 : 0.16))
-                    .clipShape(Capsule())
-            }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(TerminalTheme.allCases) { theme in
-                        Button {
-                            selectedThemeID = theme.rawValue
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                themePreview(theme)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(theme.displayName)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(selectedTheme.foregroundColor)
-                                        .lineLimit(1)
-                                    Text(theme.appearanceLabel)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(selectedTheme.mutedColor)
-                                }
-                            }
-                            .padding(12)
-                            .frame(width: 170, alignment: .leading)
-                            .background(
-                                selectedThemeID == theme.rawValue
-                                ? selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.16 : 0.18)
-                                : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.88 : 0.6)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(selectedThemeID == theme.rawValue ? selectedTheme.accentColor.opacity(0.95) : selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.4 : 0.55), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 1)
-            }
-        }
-        .padding(16)
-        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.62))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.4 : 0.55), lineWidth: 1)
-        )
-    }
-    
-    private func themePreview(_ theme: TerminalTheme) -> some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(theme.backgroundColor)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(theme.accentColor)
-                    .frame(width: 80, height: 8)
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(theme.foregroundColor.opacity(theme.isLight ? 0.8 : 0.72))
-                    .frame(width: 110, height: 5)
-                
-                HStack(spacing: 5) {
-                    ForEach(Array(theme.previewSwatches.enumerated()), id: \.offset) { item in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(item.element)
-                            .frame(width: item.offset == 0 ? 24 : 17, height: 6)
-                    }
-                }
-            }
-            .padding(10)
-        }
-        .frame(height: 72)
-        .overlay(alignment: .topTrailing) {
-            Circle()
-                .fill(theme.cursorColor)
-                .frame(width: 8, height: 8)
-                .padding(8)
-        }
-    }
-    
     private var terminalPlaceholder: some View {
         VStack(spacing: 20) {
             Image(systemName: "powershell")
