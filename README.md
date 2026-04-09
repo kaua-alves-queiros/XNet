@@ -46,20 +46,27 @@ High-fidelity ICMP and routing analysis.
 
 ## 🖥️ Remote Management & Transfers
 
-Unified workspace for terminal sessions and secure file movement.
+Professional-grade unified workspace for terminal sessions and secure file movement.
 
 | Unified Terminal (SSH/Telnet/Serial) | Remote File Transfer (FTP/SFTP) |
 |:---:|:---:|
 | <img src="assets/screenshots/terminal.png" width="400"> | <img src="assets/screenshots/ftp.png" width="400"> |
-| *Integrated POSIX Serial support for HW config.* | *Dual-pane experience for rapid file sync.* |
+| *Safari-inspired tab system with protocol-aware emulation.* | *Dual-pane experience for rapid file sync.* |
+
+### Advanced Terminal Features
+- **Protocol-Aware Emulation**: Specialized handling for Cisco, Mikrotik, and Linux environments.
+- **Precision Line Buffer**: Real-time Carriage Return (`\r`) and Backspace (`\b`) processing for perfect Tab-Completion.
+- **Smart Negotiation**: Active Telnet DONT/WONT negotiation to prevent duplicate echoes.
+- **Unified Tab Bar**: Sleek, compact 32px navigation bar for high-efficiency multi-session management.
 
 ---
 
 ## ✨ Key Features
-- **SwiftData Persistence**: Local, high-performance database for NetBox/Inventory.
+- **Smart Credential Injection**: Automatic password prompt detection and injection for rapid access.
+- **SwiftData Persistence**: Local, high-performance database for NetBox, inventory, and session history.
 - **Native Performance**: 100% Swift & SwiftUI (No Electron/Node.js).
-- **POSIX Precision**: Direct socket and terminal communication for NOC reliability.
-- **Modern Design**: Native macOS 26 aesthetic with full Dark Mode support.
+- **POSIX Precision**: Direct socket and TermIOS serial communication for hardware-level reliability.
+- **Modern Design**: Native macOS Safari-level aesthetic with `.ultraThinMaterial` and dynamic dark mode support.
 
 ---
 
