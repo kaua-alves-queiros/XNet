@@ -1,8 +1,3 @@
-//
-//  PingView.swift
-//  XNet›
-//
-
 import SwiftUI
 
 struct PingView: View {
@@ -11,6 +6,11 @@ struct PingView: View {
     @State private var pingResults: [PingResult] = []
     @State private var isRunning = false
     @State private var currentTask: Task<Void, Never>? = nil
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -20,9 +20,10 @@ struct PingView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Latency Monitor")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(selectedTheme.foregroundColor)
                         Text(isRunning ? "Pinging \(targetHost)..." : "Enter a host to start diagnostic")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(selectedTheme.mutedColor)
                     }
                     
                     Spacer()
@@ -54,7 +55,7 @@ struct PingView: View {
                             .frame(width: 100)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(isRunning ? .red : .blue)
+                        .tint(isRunning ? .red : selectedTheme.accentColor)
                         .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -72,11 +73,11 @@ struct PingView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color(NSColor.textBackgroundColor))
+                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.6))
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            .stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1)
                     )
                     .disabled(isRunning)
                     
@@ -94,11 +95,7 @@ struct PingView: View {
             .padding(.horizontal, 28)
             .padding(.top, 32)
             .padding(.bottom, 24)
-            .background(Color(NSColor.windowBackgroundColor))
 
-            
-            Divider()
-            
             // MARK: - Technical Results Table
             Table(pingResults) {
                 TableColumn("Seq") { res in
@@ -112,9 +109,9 @@ struct PingView: View {
                     Text(res.ip)
                         .font(.system(.body, design: .monospaced))
                         .bold()
-                        .foregroundStyle(res.bytes == 0 ? .red : .primary)
+                        .foregroundStyle(res.bytes == 0 ? .red : selectedTheme.foregroundColor)
                 }
-                .width(220) // Largura aumentada para suportar "Request Timed Out"
+                .width(220)
                 
                 TableColumn("Payload") { res in
                     Text(res.bytes > 0 ? "\(res.bytes) bytes" : "---")
@@ -140,7 +137,6 @@ struct PingView: View {
                                 .bold()
                                 .foregroundColor(res.time < 50 ? .green : (res.time < 150 ? .orange : .red))
                         } else {
-                            // Erro de Conexão ou Timeout
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(.red.opacity(0.3))
                                 .frame(width: 4, height: 16)
@@ -152,8 +148,23 @@ struct PingView: View {
                 }
             }
             .tableStyle(.inset)
+            .scrollContentBackground(.hidden)
         }
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
         .navigationTitle("Ping Diagnostic")
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
         .onDisappear {
             stopPing()
         }
