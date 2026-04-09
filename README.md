@@ -89,6 +89,18 @@ open XNet›.xcodeproj
 
 ---
 
+## 👥 Development Team
+
+The infrastructure and innovation behind XNet are driven by these contributors:
+
+<div align="center">
+  <a href="https://github.com/kaua-alves-queiros/XNet/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=kaua-alves-queiros/XNet" alt="Contributors list" />
+  </a>
+</div>
+
+---
+
 <div align="center">
   <p><i>“Design is not just what it looks like and feels like. Design is how it works.”</i></p>
   <b>XNet› Team</b>
