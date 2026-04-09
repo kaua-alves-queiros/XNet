@@ -64,7 +64,7 @@ struct TerminalView: View {
     
     private var mainContent: some View {
         VStack(spacing: 0) {
-            topBarSection
+            topBar
             Divider()
             contentSection
         }
@@ -77,6 +77,22 @@ struct TerminalView: View {
         )
     }
     
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+    
+    private var filteredSnippets: [XNetTerminalSnippet] {
+        let term = snippetSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return savedSnippets.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending } }
+        return savedSnippets.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.command.localizedCaseInsensitiveContains(term) }.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+    
+    private var filteredSessionLogs: [XNetTerminalLog] {
+        let term = logSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return savedSessionLogs }
+        return savedSessionLogs.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.content.localizedCaseInsensitiveContains(term) }
+    }
+
     @ViewBuilder
     private func deviceFormSheet() -> some View {
         TerminalDeviceFormSheet(deviceToEdit: editingDevice, availableGroups: formGroupOptions) { saveDevice($0) }
@@ -112,69 +128,190 @@ struct TerminalView: View {
         )
     }
     
-    private var topBarSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if tabs.count > 1 {
-                tabBar
-            }
-            
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Shell Terminal")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(selectedTheme.foregroundColor)
-                    HStack(spacing: 8) {
-                        Image(systemName: manager.isConnected ? "waveform.path.ecg" : "bolt.horizontal")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(manager.isConnected ? .green : selectedTheme.mutedColor)
-                        Text(manager.isConnected ? "Sessão ativa via \(connectionType.rawValue)" : "Pronto para conectar")
-                            .font(.subheadline)
-                            .foregroundStyle(selectedTheme.mutedColor)
-                    }
-                }
-                Spacer()
-                quickAccessBar
-            }
-                
-            HStack(spacing: 8) {
-                Group {
-                    
-                    Button {
-                        isDeviceListVisible.toggle()
-                    } label: { Image(systemName: isDeviceListVisible ? "sidebar.left" : "sidebar.right") }.help("Alternar Lateral")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                
-                Spacer()
-                
-                Group {
-                    if tabs.count <= 1 {
-                        Button(action: addTab) { Image(systemName: "plus") }.help("Nova Aba")
-                    }
-                    Button {
-                        editingSnippet = nil
-                        showingSnippetLibrary = true
-                    } label: { Image(systemName: "terminal.textbox") }.help("Snippets")
-                    
-                    Button {
-                        showingLogHistory = true
-                    } label: { Image(systemName: "clock.arrow.circlepath") }.help("Histórico de Logs")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
+    private var topBar: some View {
+        VStack(spacing: 0) {
+            tabBar
+            Divider().opacity(0.1)
+            quickAccessBar
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 32)
-        .padding(.bottom, 16)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .frame(height: 66)
+        .background(.ultraThinMaterial)
+    }
+    
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(tabs) { tab in
+                        tabItemView(tab)
+                        Divider().frame(height: 32)
+                    }
+                    
+                    Button(action: addTab) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(height: 32)
+            .clipped()
+            
+            Spacer()
+            
+            HStack(spacing: 12) {
+                Button { withAnimation(.spring()) { isDeviceListVisible.toggle() } } label: {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 13))
+                        .foregroundStyle(isDeviceListVisible ? Color.accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                
+                Button { showingLogHistory = true } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+        }
+        .frame(height: 32)
+        .background(Color.primary.opacity(0.03))
+    }
+
+    @ViewBuilder
+    private func tabItemView(_ tab: XNetTerminalTab) -> some View {
+        let isActive = selectedTabID == tab.id
+        Button {
+            saveCurrentTabState()
+            selectedTabID = tab.id
+            loadTab(tab)
+        } label: {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(tab.manager.isConnected ? Color.green : Color.secondary.opacity(0.4))
+                    .frame(width: 6, height: 6)
+                
+                Text(tab.displayName)
+                    .font(.system(size: 10.5, weight: isActive ? .semibold : .medium))
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .lineLimit(1)
+                
+                if tabs.count > 1 {
+                    Button { closeTab(tab.id) } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(isActive ? Color.primary.opacity(0.6) : Color.secondary.opacity(0.4))
+                            .padding(3)
+                            .background(isActive ? Color.primary.opacity(0.08) : Color.clear)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(minWidth: 100, maxWidth: 240)
+            .frame(height: 32)
+            .background(isActive ? Color.white.opacity(0.08) : Color.black.opacity(0.12))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    
+    private var quickAccessBar: some View {
+        HStack {
+            Spacer()
+            
+            HStack(spacing: 0) {
+                Menu {
+                    ForEach(XNetTerminalConnectionType.allCases) { type in
+                        Button(type.rawValue) { connectionType = type; updateDefaultPort(for: type) }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(connectionType.rawValue.uppercased())
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundStyle(.secondary.opacity(0.6))
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 27)
+                    .background(Color.primary.opacity(0.04))
+                }
+                .menuStyle(.borderlessButton)
+                
+                HStack(spacing: 6) {
+                    if connectionType == .serial {
+                        Picker("", selection: $host) {
+                            if availableSerialPorts.isEmpty { Text("No Ports").tag("") }
+                            ForEach(availableSerialPorts, id: \.self) { Text($0).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .scaleEffect(0.85)
+                        .frame(width: 120)
+                    } else {
+                        HStack(spacing: 0) {
+                            if connectionType == .ssh {
+                                TextField("user", text: $username)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .frame(width: 60)
+                                    .multilineTextAlignment(.center)
+                                
+                                Text("@").foregroundStyle(.secondary).font(.system(size: 11))
+                            }
+                            
+                            TextField("address", text: $host)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 11, design: .monospaced))
+                                .frame(minWidth: 100)
+                                .multilineTextAlignment(connectionType == .ssh ? .leading : .center)
+                            
+                            Text(":").foregroundStyle(.secondary).font(.system(size: 11))
+                            
+                            TextField("port", text: $port)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 11, design: .monospaced))
+                                .frame(width: 36)
+                        }
+                    }
+                    
+                    if connectionType == .ssh {
+                        Divider().frame(height: 12)
+                        SecureField("pass", text: $savedPassword)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, design: .monospaced))
+                            .frame(width: 80)
+                    }
+                }
+                .padding(.horizontal, 8)
+                
+                Button(action: toggleConnection) {
+                    Image(systemName: manager.isConnected ? "stop.fill" : "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(manager.isConnected ? .red : .green)
+                        .frame(width: 32, height: 27)
+                        .background(Color.primary.opacity(0.04))
+                }
+                .buttonStyle(.plain)
+                .disabled(host.isEmpty && connectionType != .serial)
+            }
+            .background(Color.primary.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
+            .frame(maxWidth: 500)
+            
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
     }
     
     private var contentSection: some View {
@@ -217,128 +354,13 @@ struct TerminalView: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.65 : 0.7), lineWidth: 1)
+                    .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.35 : 0.4), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(10)
         }
     }
-    
-    private var quickAccessBar: some View {
-        HStack(spacing: 8) {
-            Picker("", selection: $connectionType) {
-                ForEach(XNetTerminalConnectionType.allCases) { type in
-                    Text(type.rawValue).tag(type)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 160)
-            
-            HStack(spacing: 6) {
-                if connectionType == .serial {
-                    Picker("Porta Serial", selection: $host) {
-                        if availableSerialPorts.isEmpty { Text("Nenhuma porta").tag("") }
-                        ForEach(availableSerialPorts, id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity)
-                } else {
-                    TextField("Host / IP", text: $host)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, design: .monospaced))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(selectedTheme.backgroundColor.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                
-                TextField("Porta", text: $port)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, design: .monospaced))
-                    .frame(width: 60)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(selectedTheme.backgroundColor.opacity(0.35))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                
-                if connectionType == .ssh {
-                    TextField("Usuário", text: $username)
-                        .textFieldStyle(.plain)
-                        .background(selectedTheme.backgroundColor.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .font(.system(size: 13)).padding(.horizontal, 10).padding(.vertical, 7)
-                }
-                
-                if connectionType != .serial {
-                    SecureField("Senha", text: $savedPassword)
-                        .textFieldStyle(.plain)
-                        .background(selectedTheme.backgroundColor.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .font(.system(size: 13)).padding(.horizontal, 10).padding(.vertical, 7)
-                }
-                
-                Button(action: toggleConnection) {
-                    HStack(spacing: 6) {
-                        Image(systemName: manager.isConnected ? "stop.fill" : "bolt.fill").font(.system(size: 11, weight: .bold))
-                        Text(manager.isConnected ? "Desconectar" : "Conectar").font(.system(size: 12, weight: .bold))
-                    }.frame(minWidth: 90)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(manager.isConnected ? .red : selectedTheme.accentColor)
-                .disabled(host.isEmpty && connectionType != .serial)
-            }
-            .padding(6)
-            .background(selectedTheme.cardBackgroundColor.opacity(0.25))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-    }
 
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-    
-    private var filteredSnippets: [XNetTerminalSnippet] {
-        let term = snippetSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return savedSnippets.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending } }
-        return savedSnippets.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.command.localizedCaseInsensitiveContains(term) }.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
-    
-    private var filteredSessionLogs: [XNetTerminalLog] {
-        let term = logSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return savedSessionLogs }
-        return savedSessionLogs.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.content.localizedCaseInsensitiveContains(term) }
-    }
-
-    private var tabBar: some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(tabs) { (tab: XNetTerminalTab) in
-                        HStack(spacing: 6) {
-                            Button {
-                                saveCurrentTabState()
-                                selectedTabID = tab.id
-                                loadTab(tab)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Circle().fill(tab.manager.isConnected ? Color.green : Color.secondary.opacity(0.45)).frame(width: 7, height: 7)
-                                    Text(tab.displayName).lineLimit(1).font(.system(size: 12, weight: .medium)).foregroundStyle(selectedTheme.foregroundColor)
-                                }
-                                .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(selectedTabID == tab.id ? selectedTheme.accentColor.opacity(0.2) : selectedTheme.cardBackgroundColor.opacity(0.5))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Button { closeTab(tab.id) } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(selectedTheme.mutedColor) }.buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            Button(action: addTab) { Label("Nova Aba", systemImage: "plus") }.buttonStyle(.bordered).controlSize(.small)
-        }
-        .padding(8).background(selectedTheme.cardBackgroundColor.opacity(0.5)).clipShape(RoundedRectangle(cornerRadius: 10))
-    }
 
     private var terminalPlaceholder: some View {
         VStack(spacing: 20) {
