@@ -8,6 +8,11 @@ struct IPScanView: View {
     @State private var isScanning = false
     @State private var currentTask: Task<Void, Never>? = nil
     @State private var statusText: String = "Enter IP range (e.g. 192.168.1.0/24 or 8.8.8.1-8.8.8.10)"
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
     
     @Environment(\.modelContext) private var modelContext
     @State private var selectedDeviceToDocument: ScannedDevice? = nil
@@ -20,9 +25,10 @@ struct IPScanView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Network Discovery")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(selectedTheme.foregroundColor)
                         Text(statusText)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(selectedTheme.mutedColor)
                     }
                     
                     Spacer()
@@ -43,7 +49,7 @@ struct IPScanView: View {
                             .frame(width: 100)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(isScanning ? .red : .blue)
+                        .tint(isScanning ? .red : selectedTheme.accentColor)
                         .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -61,11 +67,11 @@ struct IPScanView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color(NSColor.textBackgroundColor))
+                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.6))
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            .stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1)
                     )
                     .disabled(isScanning)
                     
@@ -83,11 +89,7 @@ struct IPScanView: View {
             .padding(.horizontal, 28)
             .padding(.top, 32)
             .padding(.bottom, 24)
-            .background(Color(NSColor.windowBackgroundColor))
 
-            
-            Divider()
-            
             // Modern Results Table
             Table(scannedDevices) {
                 TableColumn("Node Status") { device in
@@ -98,7 +100,7 @@ struct IPScanView: View {
                         Text(device.ip)
                             .font(.system(.body, design: .monospaced))
                             .bold()
-                            .foregroundStyle(device.isOnline ? .primary : .secondary)
+                            .foregroundStyle(device.isOnline ? selectedTheme.foregroundColor : selectedTheme.mutedColor)
                     }
                 }
                 .width(160)
@@ -106,7 +108,7 @@ struct IPScanView: View {
                 TableColumn("Physical Address") { device in
                     Text(device.mac)
                         .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(device.isOnline ? .secondary : .tertiary)
+                        .foregroundStyle(device.isOnline ? selectedTheme.mutedColor : selectedTheme.mutedColor.opacity(0.5))
                 }
                 .width(180)
                 
@@ -114,16 +116,16 @@ struct IPScanView: View {
                     HStack {
                         Image(systemName: "briefcase.fill")
                             .font(.caption)
-                            .foregroundStyle(device.isOnline ? .blue.opacity(0.7) : .secondary.opacity(0.3))
+                            .foregroundStyle(device.isOnline ? selectedTheme.accentColor.opacity(0.7) : selectedTheme.mutedColor.opacity(0.3))
                         Text(device.vendor)
-                            .foregroundStyle(device.isOnline ? .primary : .secondary)
+                            .foregroundStyle(device.isOnline ? selectedTheme.foregroundColor : selectedTheme.mutedColor)
                     }
                 }
                 
                 TableColumn("Hostname") { device in
                     Text(device.hostname)
                         .italic()
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(selectedTheme.mutedColor.opacity(0.8))
                         .lineLimit(1)
                 }
                 
@@ -132,7 +134,7 @@ struct IPScanView: View {
                         selectedDeviceToDocument = device
                     } label: {
                         Image(systemName: "doc.badge.plus")
-                            .foregroundStyle(device.isOnline ? .blue : .secondary.opacity(0.5))
+                            .foregroundStyle(device.isOnline ? selectedTheme.accentColor : selectedTheme.mutedColor.opacity(0.5))
                     }
                     .buttonStyle(.plain)
                     .help("Document this device in NetBox")
@@ -141,12 +143,27 @@ struct IPScanView: View {
                 .width(40)
             }
             .tableStyle(.inset)
+            .scrollContentBackground(.hidden)
         }
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
         .sheet(item: $selectedDeviceToDocument) { device in
             QuickDocumentSheet(device: device)
                 .frame(width: 400, height: 420)
         }
         .navigationTitle("IP Discovery")
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
         .onDisappear {
             stopScan()
         }
@@ -221,6 +238,10 @@ struct QuickDocumentSheet: View {
     @Environment(\.dismiss) private var dismiss
     let device: ScannedDevice
     
+    var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
     @State private var name: String = ""
     @State private var type: String = "Network Device"
     @State private var notes: String = ""
@@ -231,17 +252,18 @@ struct QuickDocumentSheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Daily Documentation")
+                    Text("Quick Document")
                         .font(.headline)
+                        .foregroundStyle(theme.foregroundColor)
                     Text("Pre-configuration snapshot for \(device.ip)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.mutedColor)
                 }
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain)
+                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.mutedColor) }.buttonStyle(.plain)
             }
             .padding()
-            .background(Color(NSColor.windowBackgroundColor))
+            .background(theme.chromeTopColor)
             
             Form {
                 Section("Identity") {
