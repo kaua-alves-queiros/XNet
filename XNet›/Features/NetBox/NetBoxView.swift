@@ -13,6 +13,8 @@ struct NetBoxView: View {
     @Query(sort: \NetBoxDevice.name) private var allDevices: [NetBoxDevice]
     @Query(sort: \NetBoxPrefix.cidr) private var allPrefixes: [NetBoxPrefix]
     
+    @State private var showingEraseConfirmation = false
+    
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     private var selectedTheme: TerminalTheme {
         TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
@@ -44,6 +46,33 @@ struct NetBoxView: View {
                         QuickMetric(title: "Rack Units", value: "24U Used", trend: "4U Free", theme: selectedTheme)
                     }
                 }
+                
+                // Administration Section
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Administration")
+                        .font(.title3)
+                        .bold()
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    
+                    Button(role: .destructive) {
+                        showingEraseConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash.slash.fill")
+                            Text("Erase NetBox Environment")
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.15))
+                        .foregroundStyle(.red)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(32)
         }
@@ -61,6 +90,28 @@ struct NetBoxView: View {
             } else {
                 selectedThemeID = TerminalThemeStore.readThemeID()
             }
+        }
+        .alert("Erase Entire Environment?", isPresented: $showingEraseConfirmation) {
+            Button("Erase All Data", role: .destructive) {
+                purgeNetBox()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all NetBox objects (Sites, Devices, VLANs, Prefixes, and IPs) from your local SwiftData store. Terminal snippets and SSH connections will NOT be affected.")
+        }
+    }
+    
+    private func purgeNetBox() {
+        do {
+            try modelContext.delete(model: NetBoxSite.self)
+            try modelContext.delete(model: NetBoxVLANGroup.self)
+            try modelContext.delete(model: NetBoxVLAN.self)
+            try modelContext.delete(model: NetBoxPrefix.self)
+            try modelContext.delete(model: NetBoxDevice.self)
+            try modelContext.delete(model: NetBoxIP.self)
+            try modelContext.save()
+        } catch {
+            print("Failed to purge NetBox env: \(error)")
         }
     }
 }
