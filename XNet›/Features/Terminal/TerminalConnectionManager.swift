@@ -22,6 +22,10 @@ class TerminalConnectionManager {
     private var serialFileDescriptor: Int32 = -1
     private var isReadingSerial: Bool = false
     private let serialQueue = DispatchQueue(label: "com.xnet.serial", qos: .userInitiated)
+    private var autoSSHPassword: String?
+    private var autoTelnetPassword: String?
+    private var didSendSSHPassword = false
+    private var didSendTelnetPassword = false
     
     func getAvailableSerialPorts() -> [String] {
         guard let items = try? FileManager.default.contentsOfDirectory(atPath: "/dev") else { return [] }
@@ -30,6 +34,7 @@ class TerminalConnectionManager {
     
     func connectSSH(host: String, port: String, user: String) {
         logs += "Starting SSH session...\n"
+        didSendSSHPassword = false
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
@@ -41,15 +46,10 @@ class TerminalConnectionManager {
             args.append(host)
         }
         
-        // Add options to avoid strict host key checking for quick diagnostic tool UX
         args.append("-o")
-        args.append("StrictHostKeyChecking=no")
-        args.append("-o")
-        args.append("UserKnownHostsFile=/dev/null")
-        // Suppress 'Permanently added... to known hosts' warning
+        args.append("StrictHostKeyChecking=accept-new")
         args.append("-o")
         args.append("LogLevel=ERROR")
-        // Force pseudo-terminal for interactive sessions (requires two -t sometimes)
         args.append("-tt")
         
         process.arguments = args
@@ -101,6 +101,7 @@ class TerminalConnectionManager {
     
     func connectTelnet(host: String, port: String) {
         logs += "Starting Telnet session...\n"
+        didSendTelnetPassword = false
         
         let hostEndpoint = NWEndpoint.Host(host)
         guard let portEndpoint = NWEndpoint.Port(port) else {
@@ -198,44 +199,57 @@ class TerminalConnectionManager {
         }
     }
     
-    private var isParsingEscape = false
-    private var escapeBuffer = ""
-    
     private func processIncomingData(_ newString: String) {
         var current = self.logs
-        for char in newString {
-            if isParsingEscape {
-                escapeBuffer.append(char)
-                if char.isASCII && char.isLetter {
-                    if char == "D" { // Cursor Backward (Left)
-                        let numStr = escapeBuffer.filter { $0.isNumber }
-                        let count = Int(numStr) ?? 1
-                        for _ in 0..<count {
-                            if !current.isEmpty { current.removeLast() }
-                        }
-                    } else if char == "J" { // Clear Screen
-                        if escapeBuffer.contains("2") {
-                            current.removeAll()
-                        }
-                    }
-                    // We ignore C, A, B, H, K, etc. for simple line editing and display
-                    isParsingEscape = false
-                } else if !char.isNumber && char != "[" && char != ";" && char != "?" {
-                    // Abort on malformed escape sequences
-                    isParsingEscape = false
-                }
-            } else if char == "\u{1B}" { // Escape sequence start
-                isParsingEscape = true
-                escapeBuffer = ""
-            } else if char == "\u{08}" || char == "\u{7F}" { // Backspace or Delete
+        for scalar in newString.unicodeScalars {
+            switch scalar.value {
+            case 8, 127:
                 if !current.isEmpty {
                     current.removeLast()
                 }
-            } else if char != "\r" { // Ignore raw carriage returns to avoid UI shifting
-                current.append(char)
+            case 13:
+                if !current.hasSuffix("\n") {
+                    current.append("\n")
+                }
+            default:
+                current.unicodeScalars.append(scalar)
             }
         }
         self.logs = current
+        attemptAutoCredentialInjection(latestChunk: newString, currentLog: current)
+    }
+
+    private func attemptAutoCredentialInjection(latestChunk: String, currentLog: String) {
+        let promptFoundInChunk = containsPasswordPrompt(latestChunk)
+        let promptFoundInTail = containsPasswordPrompt(String(currentLog.suffix(180)))
+        let shouldInject = promptFoundInChunk || promptFoundInTail
+        guard shouldInject else { return }
+        
+        if let process = sshProcess,
+           process.isRunning,
+           !didSendSSHPassword,
+           let password = autoSSHPassword,
+           !password.isEmpty {
+            didSendSSHPassword = true
+            sendRaw(password + "\n")
+            return
+        }
+        
+        if telnetConnection?.state == .ready,
+           !didSendTelnetPassword,
+           let password = autoTelnetPassword,
+           !password.isEmpty {
+            didSendTelnetPassword = true
+            sendRaw(password + "\n")
+        }
+    }
+    
+    private func containsPasswordPrompt(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return lower.contains("password:")
+            || lower.contains("password ")
+            || lower.contains("'s password:")
+            || lower.contains("senha:")
     }
 
     private func filterTelnetCommands(from data: Data) -> Data {
@@ -302,7 +316,7 @@ class TerminalConnectionManager {
     
     func sendRaw(_ string: String) {
         if let data = string.data(using: .utf8) {
-            if sshProcess != nil && sshProcess!.isRunning {
+            if let process = sshProcess, process.isRunning {
                 pipeIn?.fileHandleForWriting.write(data)
             } else if telnetConnection != nil && telnetConnection?.state == .ready {
                 telnetConnection?.send(content: data, completion: .contentProcessed({ error in
@@ -327,6 +341,16 @@ class TerminalConnectionManager {
         sendRaw(command + "\n")
     }
     
+    func setSSHPassword(_ password: String) {
+        autoSSHPassword = password
+        didSendSSHPassword = false
+    }
+    
+    func setTelnetPassword(_ password: String) {
+        autoTelnetPassword = password
+        didSendTelnetPassword = false
+    }
+    
     func disconnect() {
         if let process = sshProcess, process.isRunning {
             process.terminate()
@@ -341,6 +365,9 @@ class TerminalConnectionManager {
             close(serialFileDescriptor)
             serialFileDescriptor = -1
         }
+        
+        didSendSSHPassword = false
+        didSendTelnetPassword = false
         
         isConnected = false
     }

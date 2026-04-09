@@ -6,69 +6,185 @@ import IOKit.ps
 struct HomeView: View {
     @State private var dashboardData = DashboardData()
     @State private var isRefreshing = false
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     
     let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
     
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+    
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                // Header
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Painel de Controle")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                    Text("Monitoramento real de hardware e rede.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 40)
+            VStack(alignment: .leading, spacing: 24) {
+                dashboardHero
+                    .padding(.top, 32)
                 
-                // Section 1: System Vitals
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recursos do Sistema")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+                sectionTitle("Recursos do Sistema", subtitle: "Monitoramento em tempo real de uso e tráfego")
+                
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 18)], spacing: 18) {
+                    MetricCard(
+                        title: "Uso de CPU",
+                        value: "\(Int(dashboardData.cpuUsage))%",
+                        detail: dashboardData.cpuUsage > 80 ? "Uso elevado" : "Operação normal",
+                        icon: "cpu",
+                        color: dashboardData.cpuUsage > 80 ? .red : .blue,
+                        emphasis: dashboardData.cpuUsage / 100
+                    )
+                    MetricCard(
+                        title: "Memória RAM",
+                        value: dashboardData.ramUsage,
+                        detail: "Memória em uso",
+                        icon: "memorychip",
+                        color: .purple
+                    )
+                    MetricCard(
+                        title: "Bateria",
+                        value: "\(Int(dashboardData.batteryLevel))%",
+                        detail: dashboardData.isCharging ? "Carregando" : "Energia atual",
+                        icon: dashboardData.batteryIcon,
+                        color: dashboardData.batteryColor,
+                        emphasis: dashboardData.batteryLevel / 100
+                    )
+                    MetricCard(
+                        title: "Download",
+                        value: dashboardData.downloadSpeed,
+                        detail: "Tráfego de entrada",
+                        icon: "arrow.down.circle.fill",
+                        color: .green
+                    )
+                    MetricCard(
+                        title: "Upload",
+                        value: dashboardData.uploadSpeed,
+                        detail: "Tráfego de saída",
+                        icon: "arrow.up.circle.fill",
+                        color: .orange
+                    )
+                }
+                
+                sectionTitle("Conectividade", subtitle: "Visão rápida dos endereços e interface atual")
+                
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 18)], spacing: 18) {
+                    NetworkHighlightCard(
+                        title: "IP Local",
+                        value: dashboardData.localIP,
+                        footnote: "Interface \(dashboardData.interfaceName)",
+                        icon: "desktopcomputer",
+                        color: .blue
+                    )
+                    NetworkHighlightCard(
+                        title: "IP Público",
+                        value: dashboardData.publicIP,
+                        footnote: "Conectividade externa",
+                        icon: "globe",
+                        color: .purple
+                    )
+                }
+                
+                sectionTitle("Detalhes da Rede", subtitle: "Resumo operacional da interface ativa")
+                
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 18)], spacing: 18) {
+                    DetailPanel(title: "Estado Atual", icon: "bolt.horizontal.circle.fill", color: .blue) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            StatusPill(label: "Atualização", value: isRefreshing ? "Sincronizando..." : "Ao vivo", color: isRefreshing ? .orange : .green)
+                            StatusPill(label: "Interface", value: dashboardData.interfaceName, color: .blue)
+                            StatusPill(label: "Wi‑Fi", value: dashboardData.ssid, color: .purple)
+                        }
+                    }
                     
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
-                        VitalsCard(title: "Uso de CPU", value: "\(Int(dashboardData.cpuUsage))%", icon: "cpu", color: dashboardData.cpuUsage > 80 ? .red : .blue)
-                        VitalsCard(title: "Memória RAM", value: dashboardData.ramUsage, icon: "memorychip", color: .purple)
-                        VitalsCard(title: "Bateria", value: "\(Int(dashboardData.batteryLevel))%", icon: dashboardData.batteryIcon, color: dashboardData.batteryColor)
-                        VitalsCard(title: "Download", value: dashboardData.downloadSpeed, icon: "arrow.down.circle.fill", color: .green)
-                        VitalsCard(title: "Upload", value: dashboardData.uploadSpeed, icon: "arrow.up.circle.fill", color: .orange)
+                    DetailPanel(title: "Configurações", icon: "point.3.connected.trianglepath.dotted", color: .indigo) {
+                        VStack(spacing: 0) {
+                            InfoRow(label: "Interface Ativa", value: dashboardData.interfaceName, icon: "antenna.radiowaves.left.and.right")
+                            Divider().padding(.leading, 44)
+                            InfoRow(label: "SSID do Wi‑Fi", value: dashboardData.ssid, icon: "wifi")
+                            Divider().padding(.leading, 44)
+                            InfoRow(label: "Sub-rede", value: dashboardData.subnetMask, icon: "rectangle.split.3x1")
+                            Divider().padding(.leading, 44)
+                            InfoRow(label: "Gateway", value: dashboardData.router, icon: "router")
+                        }
                     }
                 }
-                
-                // Section 2: IPs & Connectivity
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
-                    NetworkingCard(title: "IP Local (\(dashboardData.interfaceName))", value: dashboardData.localIP, icon: "desktopcomputer", color: .blue)
-                    NetworkingCard(title: "IP Público", value: dashboardData.publicIP, icon: "globe", color: .purple)
-                }
-                
-                // Section 3: Detailed Network Config
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Configurações de Rede")
-                        .font(.title2)
-                        .bold()
-                    
-                    VStack(spacing: 0) {
-                        InfoRow(label: "Interface Ativa", value: dashboardData.interfaceName, icon: "antenna.radiowaves.left.and.right")
-                        Divider().padding(.leading, 44)
-                        InfoRow(label: "SSID do Wi-Fi", value: dashboardData.ssid, icon: "wifi")
-                        Divider().padding(.leading, 44)
-                        InfoRow(label: "Sub-rede", value: dashboardData.subnetMask, icon: "rectangle.split.3x1")
-                        Divider().padding(.leading, 44)
-                        InfoRow(label: "Roteador Default", value: dashboardData.router, icon: "router")
-                    }
-                    .background(Color(NSColor.textBackgroundColor).opacity(0.5))
-                    .cornerRadius(12)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.1), lineWidth: 1))
-                }
-                
+
                 Spacer(minLength: 50)
             }
             .padding(.horizontal, 40)
+            .padding(.bottom, 24)
         }
+        .background(
+            LinearGradient(
+                colors: [
+                    selectedTheme.chromeTopColor,
+                    selectedTheme.chromeBottomColor
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .onAppear { refreshAll() }
         .onReceive(timer) { _ in refreshAll() }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
+    }
+    
+    private var dashboardHero: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Painel de Controle")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    Text("Monitoramento em tempo real do sistema, conectividade e tráfego da rede.")
+                        .font(.title3)
+                        .foregroundStyle(selectedTheme.mutedColor)
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 10) {
+                    HeroBadge(title: "Status", value: isRefreshing ? "Atualizando" : "Online", color: isRefreshing ? .orange : .green)
+                    HeroBadge(title: "Rede", value: dashboardData.interfaceName, color: .blue)
+                }
+            }
+            
+            HStack(spacing: 14) {
+                HeroInfoCard(title: "SSID", value: dashboardData.ssid, icon: "wifi", color: .blue)
+                HeroInfoCard(title: "Gateway", value: dashboardData.router, icon: "router", color: .orange)
+                HeroInfoCard(title: "Upload/Download", value: "\(dashboardData.uploadSpeed) • \(dashboardData.downloadSpeed)", icon: "arrow.left.arrow.right.circle", color: .purple)
+            }
+        }
+        .padding(24)
+        .background(
+            LinearGradient(
+                colors: [
+                    selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.1 : 0.16),
+                    selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.1 : 0.16),
+                    selectedTheme.cardBackgroundColor
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.35 : 0.45), lineWidth: 1)
+        )
+    }
+    
+    private func sectionTitle(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(selectedTheme.foregroundColor)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(selectedTheme.mutedColor)
+        }
     }
     
     private func refreshAll() {
@@ -86,64 +202,117 @@ struct HomeView: View {
 
 // MARK: - Components
 
-struct VitalsCard: View {
+struct MetricCard: View {
     let title: String
     let value: String
+    let detail: String
     let icon: String
     let color: Color
+    var emphasis: Double? = nil
+    
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
-                .frame(width: 40, height: 40)
-                .background(color.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(color)
+                    .frame(width: 42, height: 42)
+                    .background(color.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                Spacer()
+                if let emphasis {
+                    Text("\(Int(emphasis * 100))%")
+                        .font(.caption.bold())
+                        .foregroundStyle(color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(color.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
             
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.mutedColor)
                 Text(value)
-                    .font(.headline)
-                    .bold()
+                    .font(.title3.bold())
+                    .foregroundStyle(theme.foregroundColor)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(theme.mutedColor)
             }
-            Spacer()
+            
+            if let emphasis {
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(theme.panelBorderColor.opacity(theme.isLight ? 0.18 : 0.28))
+                        Capsule()
+                            .fill(color.gradient)
+                            .frame(width: max(12, proxy.size.width * min(max(emphasis, 0), 1)))
+                    }
+                }
+                .frame(height: 8)
+            }
         }
-        .padding()
-        .background(Color(NSColor.textBackgroundColor))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.03), radius: 3, x: 0, y: 1)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.94 : 0.68))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(theme.panelBorderColor.opacity(theme.isLight ? 0.35 : 0.45), lineWidth: 1)
+        )
     }
 }
 
-struct NetworkingCard: View {
+struct NetworkHighlightCard: View {
     let title: String
     let value: String
+    let footnote: String
     let icon: String
     let color: Color
     
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: icon)
                     .foregroundStyle(color)
-                    .font(.headline)
+                    .font(.headline.weight(.bold))
                 Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(theme.mutedColor)
+                Spacer()
+                Circle()
+                    .fill(color.opacity(0.8))
+                    .frame(width: 10, height: 10)
             }
             Text(value)
                 .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .foregroundStyle(theme.foregroundColor)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
+            Text(footnote)
+                .font(.caption)
+                .foregroundStyle(theme.mutedColor)
         }
-        .padding()
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.textBackgroundColor))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.94 : 0.68))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(color.opacity(0.18), lineWidth: 1)
+        )
     }
 }
 
@@ -152,19 +321,155 @@ struct InfoRow: View {
     let value: String
     let icon: String
     
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .frame(width: 28, height: 28)
-                .foregroundStyle(.blue)
+                .foregroundStyle(theme.accentColor)
             Text(label)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.mutedColor)
             Spacer()
             Text(value)
                 .bold()
+                .foregroundStyle(theme.foregroundColor)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+    }
+}
+
+struct DetailPanel<Content: View>: View {
+    let title: String
+    let icon: String
+    let color: Color
+    @ViewBuilder let content: Content
+    
+    init(title: String, icon: String, color: Color, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.content = content()
+    }
+    
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .foregroundStyle(color)
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(theme.foregroundColor)
+                Spacer()
+            }
+            content
+        }
+        .padding(18)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.9 : 0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(theme.panelBorderColor.opacity(theme.isLight ? 0.35 : 0.45), lineWidth: 1)
+        )
+    }
+}
+
+struct HeroBadge: View {
+    let title: String
+    let value: String
+    let color: Color
+    
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(theme.mutedColor)
+            Text(value)
+                .font(.subheadline.bold())
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.88 : 0.68))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+struct HeroInfoCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundStyle(color)
+                .frame(width: 38, height: 38)
+                .background(color.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(theme.mutedColor)
+                Text(value)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(theme.foregroundColor)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.88 : 0.64))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+struct StatusPill: View {
+    let label: String
+    let value: String
+    let color: Color
+    
+    private var theme: TerminalTheme {
+        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    }
+    
+    var body: some View {
+        HStack {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(theme.mutedColor)
+            }
+            Spacer()
+            Text(value)
+                .font(.caption.bold())
+                .foregroundStyle(theme.foregroundColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.82 : 0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -359,9 +664,31 @@ struct DashboardData {
     }
     
     private func getGatewayAddress() -> String {
-        // No macOS, ler o gateway requer percorrer a routing table via sysctl.
-        // Simulando a lógica de descoberta real via comando 'route' se necessário.
-        return "192.168.1.1" // Placeholder p/ agora, mas Ip/Mask já são REAIS.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/route")
+        process.arguments = ["-n", "get", "default"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return "---"
+        }
+        
+        guard process.terminationStatus == 0 else { return "---" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { return "---" }
+        for line in output.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("gateway:") {
+                let value = trimmed.replacingOccurrences(of: "gateway:", with: "").trimmingCharacters(in: .whitespaces)
+                return value.isEmpty ? "---" : value
+            }
+        }
+        return "---"
     }
     
     private func fetchPublicIP() async -> String? {

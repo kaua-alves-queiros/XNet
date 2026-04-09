@@ -5,156 +5,514 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import SwiftData
 
 struct FTPView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var connectionManager = FTPConnectionManager()
+    @State private var registeredDevices: [TerminalDevice] = []
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     
     // Connection Settings
     @State private var host = ""
     @State private var port = "22"
     @State private var username = ""
     @State private var password = ""
-    @State private var isSFTP = true
+    @State private var transferProtocol: TransferProtocolType = .sftp
+    @State private var selectedCredentialID: String?
+    @State private var selectedGroupFilter = "Todos"
+    @State private var deviceSearch = ""
+    
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Premium Unified Header
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("File Transfer")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text(connectionManager.isConnected ? "Connected to \(host)" : "Enter server details to explore files")
+            headerSection
+            Divider()
+            
+            GeometryReader { geo in
+                HStack(spacing: 0) {
+                    deviceSidebar
+                        .frame(width: 320)
+                    
+                    Divider()
+                    
+                    HStack(spacing: 0) {
+                        LocalFileBrowser(manager: connectionManager)
+                            .frame(width: (geo.size.width - 320) / 2)
+                        
+                        Divider()
+                        
+                        RemoteFileBrowser(manager: connectionManager)
+                            .frame(width: (geo.size.width - 320) / 2)
+                    }
+                }
+            }
+            .background(
+                LinearGradient(
+                    colors: [
+                        selectedTheme.chromeTopColor.opacity(selectedTheme.isLight ? 0.95 : 0.72),
+                        selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.03 : 0.06)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    selectedTheme.chromeTopColor,
+                    selectedTheme.chromeBottomColor
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .navigationTitle("")
+        .onAppear {
+            loadRegisteredDevices()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TerminalDevicesUpdated"))) { _ in
+            loadRegisteredDevices()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
+    }
+    
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("File Transfer")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(connectionManager.isConnected ? Color.green : Color.secondary.opacity(0.5))
+                            .frame(width: 8, height: 8)
+                        Text(connectionManager.isConnected ? "Sessão ativa em \(transferProtocol.rawValue.uppercased()) • \(host)" : "Clique em um dispositivo e conecte automaticamente")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(selectedTheme.mutedColor)
+                    }
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Picker("", selection: $transferProtocol) {
+                        Text("SFTP").tag(TransferProtocolType.sftp)
+                        Text("FTP").tag(TransferProtocolType.ftp)
+                        Text("SCP").tag(TransferProtocolType.scp)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                    .onChange(of: transferProtocol) { _, newValue in
+                        updatePort(for: newValue)
+                    }
+                    
+                    Button(action: toggleConnection) {
+                        HStack {
+                            Image(systemName: connectionManager.isConnected ? "stop.fill" : "bolt.fill")
+                            Text(connectionManager.isConnected ? "Disconnect" : "Connect")
+                        }
+                        .frame(width: 110)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(connectionManager.isConnected ? .red : selectedTheme.accentColor)
+                    .disabled(host.isEmpty)
+                }
+            }
+            
+            HStack(spacing: 12) {
+                connectionField(icon: "server.rack", title: "Host", width: 200) {
+                    TextField("Host", text: $host)
+                        .textFieldStyle(.plain)
+                }
+                connectionField(icon: "number", title: "Porta", width: 80) {
+                    TextField("Port", text: $port)
+                        .textFieldStyle(.plain)
+                }
+                connectionField(icon: "person.fill", title: "Usuário", width: 140) {
+                    TextField("User", text: $username)
+                        .textFieldStyle(.plain)
+                }
+                connectionField(icon: "key.fill", title: "Senha", width: 150) {
+                    SecureField("Pass", text: $password)
+                        .textFieldStyle(.plain)
+                }
+                
+                Spacer(minLength: 0)
+                
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(connectionManager.statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(selectedTheme.mutedColor)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                    if connectionManager.isTransferring {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Transferindo...")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(selectedTheme.accentColor)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.12 : 0.16))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 28)
+        .padding(.bottom, 18)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+    
+    private var deviceSidebar: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Hosts")
+                        .font(.headline)
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    Text("FTP, SFTP e SCP via cadastro")
+                        .font(.caption)
+                        .foregroundStyle(selectedTheme.mutedColor)
+                }
+                Spacer()
+                Text("\(filteredRegisteredDevices.count)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.64))
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+            
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(selectedTheme.mutedColor)
+                TextField("Buscar host, IP ou grupo", text: $deviceSearch)
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(selectedTheme.foregroundColor)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.58))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 14)
+            
+            HStack(spacing: 10) {
+                Menu {
+                    ForEach(availableGroupFilters, id: \.self) { group in
+                        Button(group) {
+                            selectedGroupFilter = group
+                        }
+                    }
+                } label: {
+                    Label(selectedGroupFilter, systemImage: "folder")
+                        .font(.caption.weight(.semibold))
+                }
+                .menuStyle(.borderlessButton)
+                
+                Spacer()
+                
+                Text("Clique para conectar")
+                    .font(.caption2)
+                    .foregroundStyle(selectedTheme.mutedColor)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            
+            ScrollView {
+                LazyVStack(spacing: 14) {
+                    ForEach(groupedTransferDevices, id: \.group) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(selectedTheme.mutedColor)
+                                Text(group.group)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(selectedTheme.foregroundColor)
+                                Spacer()
+                                Text("\(group.devices.count)")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(selectedTheme.mutedColor)
+                            }
+                            
+                            ForEach(group.devices) { device in
+                                transferDeviceCard(device)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
+            }
+        }
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+    
+    private func connectionField<Content: View>(icon: String, title: String, width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(selectedTheme.mutedColor)
+            content()
+                .foregroundStyle(selectedTheme.foregroundColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(width: width, alignment: .leading)
+        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.35 : 0.45), lineWidth: 1)
+        )
+    }
+    
+    private func transferDeviceCard(_ device: TerminalDevice) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                connectToDevice(device, protocolOverride: preferredProtocol(for: device))
+            } label: {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.16 : 0.24))
+                            .frame(width: 34, height: 34)
+                        Image(systemName: protocolIcon(device))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(selectedTheme.accentColor)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(device.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(selectedTheme.foregroundColor)
+                            .lineLimit(1)
+                        Text("\(device.username.isEmpty ? "sem usuário" : device.username) • \(device.host)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(selectedTheme.mutedColor)
+                            .lineLimit(1)
+                        Text("Preferido: \(preferredProtocol(for: device).rawValue.uppercased())")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(selectedTheme.accentColor)
                     }
                     
                     Spacer()
                     
-                    HStack(spacing: 12) {
-                        Picker("", selection: $isSFTP) {
-                            Text("SFTP").tag(true)
-                            Text("FTP").tag(false)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 120)
-                        .onChange(of: isSFTP) { _, newSFTP in
-                            port = newSFTP ? "22" : "21"
-                        }
-                        
-                        Button(action: toggleConnection) {
-                            HStack {
-                                Image(systemName: connectionManager.isConnected ? "stop.fill" : "bolt.fill")
-                                Text(connectionManager.isConnected ? "Disconnect" : "Connect")
-                            }
-                            .frame(width: 100)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(connectionManager.isConnected ? .red : .blue)
-                        .disabled(host.isEmpty)
-                    }
-                }
-                
-                // Connection Input Bar
-                HStack(spacing: 16) {
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "server.rack")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 10))
-                            TextField("Host", text: $host)
-                                .textFieldStyle(.plain)
-                                .frame(width: 140)
-                        }
-                        
-                        Divider().frame(height: 12)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "number")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 10))
-                            TextField("Port", text: $port)
-                                .textFieldStyle(.plain)
-                                .frame(width: 40)
-                        }
-                        
-                        Divider().frame(height: 12)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 10))
-                            TextField("User", text: $username)
-                                .textFieldStyle(.plain)
-                                .frame(width: 80)
-                        }
-                        
-                        Divider().frame(height: 12)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "key.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 10))
-                            SecureField("Pass", text: $password)
-                                .textFieldStyle(.plain)
-                                .frame(width: 80)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                    )
-                    
-                    Spacer(minLength: 0)
-                    
-                    if connectionManager.isTransferring {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text("Transferring...")
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(20)
+                    if selectedCredentialID == device.credentialID && connectionManager.isConnected && host == device.host {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
                     }
                 }
             }
-            .padding(.horizontal, 28)
-            .padding(.top, 32)
-            .padding(.bottom, 24)
-            .background(Color(NSColor.windowBackgroundColor))
+            .buttonStyle(.plain)
             
-            Divider()
-            
-            // Dual Pane View
-            GeometryReader { geo in
-                HStack(spacing: 0) {
-                    LocalFileBrowser(manager: connectionManager)
-                        .frame(width: geo.size.width / 2)
-                    
-                    Divider()
-                    
-                    RemoteFileBrowser(manager: connectionManager)
-                        .frame(width: geo.size.width / 2)
-                }
+            HStack(spacing: 6) {
+                quickConnectButton("SFTP", protocolType: .sftp, device: device, tint: .blue)
+                quickConnectButton("SCP", protocolType: .scp, device: device, tint: .purple)
+                quickConnectButton("FTP", protocolType: .ftp, device: device, tint: .orange)
             }
-            .background(Color.black.opacity(0.02))
         }
-        .navigationTitle("")
+        .padding(12)
+        .background(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.14 : 0.18) : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(0.38) : selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.32 : 0.45), lineWidth: 1)
+        )
+    }
+    
+    private func quickConnectButton(_ title: String, protocolType: TransferProtocolType, device: TerminalDevice, tint: Color) -> some View {
+        Button {
+            connectToDevice(device, protocolOverride: protocolType)
+        } label: {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(tint.opacity(0.9))
+        .controlSize(.mini)
     }
     
     private func toggleConnection() {
         if connectionManager.isConnected {
             connectionManager.disconnect()
         } else {
-            connectionManager.connect(host: host, port: port, user: username, pass: password, isSFTP: isSFTP)
+            connectionManager.connect(host: host, port: port, user: username, pass: password, protocolType: transferProtocol)
         }
+    }
+    
+    private func loadRegisteredDevices() {
+        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.groupName, order: .forward), SortDescriptor(\.name, order: .forward)])
+        let rows = (try? modelContext.fetch(descriptor)) ?? []
+        if !rows.isEmpty {
+            registeredDevices = rows
+        } else if let cached = cachedTransferDevices(), !cached.isEmpty {
+            registeredDevices = cached
+        } else {
+            registeredDevices = []
+        }
+        if !availableGroupFilters.contains(selectedGroupFilter) {
+            selectedGroupFilter = "Todos"
+        }
+    }
+    
+    private func applyDeviceToFTP(_ device: TerminalDevice, protocolOverride: TransferProtocolType? = nil) {
+        selectedCredentialID = device.credentialID
+        host = device.host
+        username = device.username
+        password = FTPPasswordStore.readPassword(credentialID: device.credentialID) ?? ""
+        let resolvedProtocol = protocolOverride ?? preferredProtocol(for: device)
+        transferProtocol = resolvedProtocol
+        port = resolvedPort(for: device, protocolType: resolvedProtocol)
+    }
+    
+    private func connectToDevice(_ device: TerminalDevice, protocolOverride: TransferProtocolType? = nil) {
+        applyDeviceToFTP(device, protocolOverride: protocolOverride)
+        if connectionManager.isConnected {
+            connectionManager.disconnect()
+        }
+        connectionManager.connect(host: host, port: port, user: username, pass: password, protocolType: transferProtocol)
+    }
+    
+    private func updatePort(for protocolType: TransferProtocolType) {
+        guard let activeDevice = registeredDevices.first(where: { $0.credentialID == selectedCredentialID }) else {
+            switch protocolType {
+            case .sftp, .scp:
+                port = "22"
+            case .ftp:
+                port = "21"
+            }
+            return
+        }
+        port = resolvedPort(for: activeDevice, protocolType: protocolType)
+    }
+    
+    private func preferredProtocol(for device: TerminalDevice) -> TransferProtocolType {
+        let type = device.connectionType.uppercased()
+        if type.contains("SCP") {
+            return .scp
+        }
+        if type.contains("FTP") && !type.contains("SFTP") {
+            return .ftp
+        }
+        return .sftp
+    }
+    
+    private func resolvedPort(for device: TerminalDevice, protocolType: TransferProtocolType) -> String {
+        let trimmedPort = device.port.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedPort.isEmpty {
+            return trimmedPort
+        }
+        switch protocolType {
+        case .sftp, .scp:
+            return "22"
+        case .ftp:
+            return "21"
+        }
+    }
+    
+    private func protocolIcon(_ device: TerminalDevice) -> String {
+        let type = device.connectionType.uppercased()
+        if type.contains("FTP") && !type.contains("SFTP") {
+            return "externaldrive.connected.to.line.below"
+        }
+        if type.contains("SCP") {
+            return "shippingbox.fill"
+        }
+        return "lock.shield"
+    }
+    
+    private var availableGroupFilters: [String] {
+        let names = Set(transferCapableDevices.map { normalizedGroupName($0.groupName) })
+        return ["Todos"] + names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+    
+    private var transferCapableDevices: [TerminalDevice] {
+        registeredDevices.filter {
+            !$0.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && $0.connectionType.localizedCaseInsensitiveCompare("Serial") != .orderedSame
+        }
+    }
+    
+    private var filteredRegisteredDevices: [TerminalDevice] {
+        let search = deviceSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        return transferCapableDevices.filter { device in
+            let matchesGroup = selectedGroupFilter == "Todos" || normalizedGroupName(device.groupName) == selectedGroupFilter
+            let matchesSearch = search.isEmpty
+            || device.name.localizedCaseInsensitiveContains(search)
+            || device.host.localizedCaseInsensitiveContains(search)
+            || device.username.localizedCaseInsensitiveContains(search)
+            || normalizedGroupName(device.groupName).localizedCaseInsensitiveContains(search)
+            return matchesGroup && matchesSearch
+        }
+    }
+    
+    private var groupedTransferDevices: [(group: String, devices: [TerminalDevice])] {
+        let grouped = Dictionary(grouping: filteredRegisteredDevices) { normalizedGroupName($0.groupName) }
+        return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { key in
+            let devices = (grouped[key] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return (group: key, devices: devices)
+        }
+    }
+    
+    private func normalizedGroupName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Geral" : trimmed
+    }
+    
+    private func cachedTransferDevices() -> [TerminalDevice]? {
+        let decoder = JSONDecoder()
+        for key in [TransferDeviceCacheEntry.storageKeyV3, TransferDeviceCacheEntry.storageKeyV2] {
+            guard let data = UserDefaults.standard.data(forKey: key),
+                  let cached = try? decoder.decode([TransferDeviceCacheEntry].self, from: data),
+                  !cached.isEmpty else { continue }
+            return cached.map {
+                TerminalDevice(
+                    name: $0.name,
+                    groupName: normalizedGroupName($0.groupName),
+                    connectionType: $0.connectionType,
+                    host: $0.host,
+                    port: $0.port,
+                    username: $0.username,
+                    notes: $0.notes,
+                    credentialID: $0.credentialID
+                )
+            }
+        }
+        return nil
     }
 }
 
@@ -173,6 +531,43 @@ enum SortOption: String, CaseIterable, Identifiable {
     case name = "Name"
     case date = "Date"
     var id: String { self.rawValue }
+}
+
+private struct TransferDeviceCacheEntry: Decodable {
+    static let storageKeyV3 = "terminal.device.cache.v3"
+    static let storageKeyV2 = "terminal.device.cache.v2"
+    
+    let name: String
+    let groupName: String
+    let connectionType: String
+    let host: String
+    let port: String
+    let username: String
+    let notes: String
+    let credentialID: String
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case groupName
+        case connectionType
+        case host
+        case port
+        case username
+        case notes
+        case credentialID
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        groupName = try container.decodeIfPresent(String.self, forKey: .groupName) ?? "Geral"
+        connectionType = try container.decode(String.self, forKey: .connectionType)
+        host = try container.decode(String.self, forKey: .host)
+        port = try container.decode(String.self, forKey: .port)
+        username = try container.decode(String.self, forKey: .username)
+        notes = try container.decode(String.self, forKey: .notes)
+        credentialID = try container.decode(String.self, forKey: .credentialID)
+    }
 }
 
 // MARK: - Local Browser
@@ -508,5 +903,13 @@ struct RemoteFileBrowser: View {
 extension View {
     func onItemDoubleClick(action: @escaping () -> Void) -> some View {
         self.onTapGesture(count: 2, perform: action)
+    }
+}
+
+private enum FTPPasswordStore {
+    private static let keyPrefix = "br.com.myrouter.xnet.terminal.password."
+    
+    static func readPassword(credentialID: String) -> String? {
+        UserDefaults.standard.string(forKey: keyPrefix + credentialID)
     }
 }
