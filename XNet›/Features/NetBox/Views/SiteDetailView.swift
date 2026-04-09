@@ -12,6 +12,11 @@ struct SiteDetailView: View {
     @State private var editSession: EditSession? = nil
     @State private var ename = ""
     @State private var edesc = ""
+    
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
 
     var body: some View {
         content
@@ -27,6 +32,14 @@ struct SiteDetailView: View {
                     .keyboardShortcut("e", modifiers: [.command])
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(
+                LinearGradient(
+                    colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
             .sheet(item: $editSession) { _ in
                 editSheet
                     #if os(macOS)
@@ -36,6 +49,13 @@ struct SiteDetailView: View {
                     #else
                     .presentationDetents([.medium, .large])
                     #endif
+            }
+            .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+                if let themeID = output.object as? String {
+                    selectedThemeID = themeID
+                } else {
+                    selectedThemeID = TerminalThemeStore.readThemeID()
+                }
             }
     }
 
@@ -47,77 +67,101 @@ struct SiteDetailView: View {
     private var content: some View {
         #if os(macOS)
         Form {
-            Section("Physical Context") {
+            Section {
                 LabeledContent("Site Name", value: site.name)
                 LabeledContent("Inventory", value: "\(site.devices.count) Hardware Units")
                 LabeledContent("Subnets", value: "\(site.prefixes.count) Subnet Prefixes")
+            } header: {
+                Text("Physical Context")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
 
-            Section("Devices in Site") {
+            Section {
                 if site.devices.isEmpty {
                     Text("No physical machines.")
                         .italic()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 } else {
                     ForEach(site.devices) { dev in
                         HStack(alignment: .firstTextBaseline) {
                             Image(systemName: "cpu")
-                                .foregroundStyle(.blue.gradient)
+                                .foregroundStyle(selectedTheme.accentColor.gradient)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(dev.name).bold()
+                                    .foregroundStyle(selectedTheme.foregroundColor)
                                 Text(dev.deviceType)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(selectedTheme.mutedColor)
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .accessibilityHidden(true)
+                                .foregroundStyle(selectedTheme.mutedColor.opacity(0.3))
                         }
                         .contentShape(Rectangle())
                     }
                 }
+            } header: {
+                Text("Devices in Site")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
 
-            Section("Local Networks") {
+            Section {
                 if site.prefixes.isEmpty {
                     Text("No prefixes in site.")
                         .italic()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 } else {
                     ForEach(site.prefixes) { p in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(p.cidr)
                                 .font(.system(.body, design: .monospaced, weight: .bold))
+                                .foregroundStyle(selectedTheme.foregroundColor)
                             if !p.prefixDescription.isEmpty {
                                 Text(p.prefixDescription)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(selectedTheme.mutedColor)
                             }
                         }
                     }
                 }
+            } header: {
+                Text("Local Networks")
+                    .foregroundStyle(selectedTheme.mutedColor)
+                    .font(.caption)
+                    .bold()
             }
 
             if !site.siteDescription.isEmpty {
-                Section("Technical Context") {
+                Section {
                     Text(site.siteDescription)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.foregroundColor.opacity(0.8))
                         .textSelection(.enabled)
+                } header: {
+                    Text("Technical Context")
+                        .foregroundStyle(selectedTheme.mutedColor)
+                        .font(.caption)
+                        .bold()
                 }
             }
 
-            Section("Actions") {
+            Section {
                 Button {
                     beginEditing()
                 } label: {
                     Label("Edit Site Details", systemImage: "pencil")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
             }
         }
         .formStyle(.grouped)
+        .foregroundStyle(selectedTheme.foregroundColor)
         #else
         List {
             Section("Physical Context") {
@@ -169,12 +213,13 @@ struct SiteDetailView: View {
             HStack {
                 Text("Edit Physical Site")
                     .font(.headline)
+                    .foregroundStyle(selectedTheme.foregroundColor)
                 Spacer()
                 Button {
                     editSession = nil
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
@@ -186,10 +231,13 @@ struct SiteDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Description")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                     TextEditor(text: $edesc)
                         .font(.body)
                         .frame(minHeight: 100)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.primary.opacity(0.05))
+                        .cornerRadius(4)
                 }
             }
             .formStyle(.grouped)
@@ -218,25 +266,15 @@ struct SiteDetailView: View {
                 }
                 .keyboardShortcut("s", modifiers: [.command])
                 .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
                 .disabled(ename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding()
+        .background(selectedTheme.backgroundColor)
         .onAppear {
             if ename.isEmpty { ename = site.name }
             if edesc.isEmpty { edesc = site.siteDescription }
         }
     }
 }
-#if DEBUG
-#Preview("Site Detail (macOS)") {
-    #if os(macOS)
-    // Placeholder preview for macOS
-    let sampleSite = NetBoxSite(name: "Sample Site", siteDescription: "A sample site for preview")
-    SiteDetailView(site: sampleSite)
-    #else
-    EmptyView()
-    #endif
-}
-#endif
-
