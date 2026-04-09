@@ -72,6 +72,7 @@ enum TerminalTheme: String, CaseIterable, Identifiable {
     case everforestDark = "everforest-dark"
     case nightOwl = "night-owl"
     case rosePineMoon = "rose-pine-moon"
+    case native = "native"
     
     var id: String { rawValue }
     
@@ -91,6 +92,7 @@ enum TerminalTheme: String, CaseIterable, Identifiable {
         case .everforestDark: "Everforest Dark"
         case .nightOwl: "Night Owl"
         case .rosePineMoon: "Rosé Pine Moon"
+        case .native: "Native macOS"
         }
     }
     
@@ -99,38 +101,86 @@ enum TerminalTheme: String, CaseIterable, Identifiable {
     }
     
     var isLight: Bool {
+        if self == .native {
+            if let appearance = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) {
+                return appearance == .aqua
+            }
+            return false
+        }
         switch self {
         case .termiusLight, .flexokiLight:
-            true
+            return true
         default:
-            false
+            return false
         }
     }
     
-    var backgroundColor: Color { spec.background.color }
-    var foregroundColor: Color { spec.foreground.color }
-    var accentColor: Color { spec.accent.color }
-    var cursorColor: Color { spec.cursor.color }
-    var chromeTopColor: Color { spec.chromeTop.color }
-    var chromeBottomColor: Color { spec.chromeBottom.color }
-    var sidebarTopColor: Color { spec.sidebarTop.color }
-    var sidebarBottomColor: Color { spec.sidebarBottom.color }
-    var cardBackgroundColor: Color { spec.card.color }
-    var panelBorderColor: Color { spec.cardBorder.color }
+    var backgroundColor: Color { 
+        if self == .native { return Color(NSColor.windowBackgroundColor) }
+        return spec.background.color 
+    }
+    var foregroundColor: Color { 
+        if self == .native { return Color(NSColor.labelColor) }
+        return spec.foreground.color 
+    }
+    var accentColor: Color { 
+        if self == .native { return Color.accentColor }
+        return spec.accent.color 
+    }
+    var cursorColor: Color { 
+        if self == .native { return Color(NSColor.labelColor) }
+        return spec.cursor.color 
+    }
+    var chromeTopColor: Color { 
+        if self == .native { return Color(NSColor.windowBackgroundColor) }
+        return spec.chromeTop.color 
+    }
+    var chromeBottomColor: Color { 
+        if self == .native { return Color(NSColor.windowBackgroundColor) }
+        return spec.chromeBottom.color 
+    }
+    var sidebarTopColor: Color { 
+        if self == .native { return Color(NSColor.windowBackgroundColor) }
+        return spec.sidebarTop.color 
+    }
+    var sidebarBottomColor: Color { 
+        if self == .native { return Color(NSColor.windowBackgroundColor) }
+        return spec.sidebarBottom.color 
+    }
+    var cardBackgroundColor: Color { 
+        if self == .native { return Color(NSColor.controlBackgroundColor) }
+        return spec.card.color 
+    }
+    var panelBorderColor: Color { 
+        if self == .native { return Color(NSColor.separatorColor) }
+        return spec.cardBorder.color 
+    }
     var mutedColor: Color { foregroundColor.opacity(isLight ? 0.62 : 0.58) }
     var previewSwatches: [Color] {
         [
-            spec.accent.color,
+            accentColor,
             spec.normalANSI[1].color,
             spec.normalANSI[2].color,
             spec.brightANSI[4].color
         ]
     }
     
-    var defaultForegroundNSColor: NSColor { spec.foreground.nsColor }
-    var defaultBackgroundNSColor: NSColor { spec.background.nsColor }
-    var cursorNSColor: NSColor { spec.cursor.nsColor }
-    var selectionNSColor: NSColor { spec.accent.withAlpha(isLight ? 0.24 : 0.32).nsColor }
+    var defaultForegroundNSColor: NSColor { 
+        if self == .native { return NSColor.labelColor }
+        return spec.foreground.nsColor 
+    }
+    var defaultBackgroundNSColor: NSColor { 
+        if self == .native { return NSColor.windowBackgroundColor }
+        return spec.background.nsColor 
+    }
+    var cursorNSColor: NSColor { 
+        if self == .native { return NSColor.labelColor }
+        return spec.cursor.nsColor 
+    }
+    var selectionNSColor: NSColor { 
+        if self == .native { return NSColor.selectedTextBackgroundColor }
+        return spec.accent.withAlpha(isLight ? 0.24 : 0.32).nsColor 
+    }
     
     func ansiColor(index: Int, bright: Bool) -> NSColor {
         let palette = bright ? spec.brightANSI : spec.normalANSI
@@ -536,6 +586,31 @@ enum TerminalTheme: String, CaseIterable, Identifiable {
                     TerminalThemeColor(hex: 0xD9C3F6),
                     TerminalThemeColor(hex: 0xF6B8B3),
                     TerminalThemeColor(hex: 0xF6F3FF)
+                ]
+            )
+        case .native:
+            TerminalThemeSpec(
+                background: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0), // Placeholders, overridden by getters
+                foreground: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                accent: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                cursor: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                chromeTop: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                chromeBottom: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                sidebarTop: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                sidebarBottom: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                card: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                cardBorder: TerminalThemeColor(red: 0, green: 0, blue: 0, alpha: 0),
+                normalANSI: [
+                    TerminalThemeColor(hex: 0x000000), TerminalThemeColor(hex: 0xAF0000),
+                    TerminalThemeColor(hex: 0x00AF00), TerminalThemeColor(hex: 0xAF5F00),
+                    TerminalThemeColor(hex: 0x0000AF), TerminalThemeColor(hex: 0xAF00AF),
+                    TerminalThemeColor(hex: 0x00AFAF), TerminalThemeColor(hex: 0xBCBCBC)
+                ],
+                brightANSI: [
+                    TerminalThemeColor(hex: 0x585858), TerminalThemeColor(hex: 0xFF5F5F),
+                    TerminalThemeColor(hex: 0x87AF87), TerminalThemeColor(hex: 0xFFFF87),
+                    TerminalThemeColor(hex: 0x5F87FF), TerminalThemeColor(hex: 0xAF87FF),
+                    TerminalThemeColor(hex: 0x5FFFFF), TerminalThemeColor(hex: 0xFFFFFF)
                 ]
             )
         }
