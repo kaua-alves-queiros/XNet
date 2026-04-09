@@ -62,34 +62,3 @@ final class CancelFlag: @unchecked Sendable {
     init() {}
 }
 
-@Model
-final class TerminalDevice {
-    var name: String
-    var groupName: String
-    var connectionType: String
-    var host: String
-    var port: String
-    var username: String
-    var notes: String
-    var credentialID: String
-    
-    init(name: String, groupName: String = "Geral", connectionType: String = "SSH", host: String, port: String, username: String = "", notes: String = "", credentialID: String = UUID().uuidString) {
-        self.name = name
-        self.groupName = groupName
-        self.connectionType = connectionType
-        self.host = host
-        self.port = port
-        self.username = username
-        self.notes = notes
-        self.credentialID = credentialID
-    }
-}
-
-@Model
-final class TerminalDeviceGroup {
-    var name: String
-    
-    init(name: String = "Geral") {
-        self.name = name
-    }
-}

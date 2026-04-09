@@ -6,6 +6,7 @@
 import Foundation
 import Network
 import Darwin
+import Observation
 
 @Observable
 class TerminalConnectionManager {

@@ -1,431 +1,300 @@
 import SwiftUI
-import SwiftData
 import UniformTypeIdentifiers
 
 struct TerminalView: View {
-    @Environment(\.modelContext) private var modelContext
-    @State private var savedDevices: [TerminalDeviceEntry] = []
+    @State private var savedDevices: [XNetTerminalDevice] = []
     @State private var savedGroups: [String] = ["Geral"]
     
-    @State private var connectionType: ConnectionType = .ssh
+    @State private var connectionType: XNetTerminalConnectionType = .ssh
     @State private var host: String = ""
     @State private var port: String = "22"
     @State private var username: String = ""
     @State private var savedPassword: String = ""
-    @State private var manager = TerminalConnectionManager()
+    @State private var manager: TerminalConnectionManager = TerminalConnectionManager()
     @State private var availableSerialPorts: [String] = []
     @State private var selectedDeviceID: UUID?
-    @State private var showingDeviceForm = false
-    @State private var showingGroupForm = false
-    @State private var editingDevice: TerminalDeviceEntry?
-    @State private var isApplyingSavedDevice = false
-    @State private var isDeviceListVisible = true
-    @State private var tabs: [TerminalTabItem] = []
+    @State private var showingDeviceForm: Bool = false
+    @State private var showingGroupForm: Bool = false
+    @State private var editingDevice: XNetTerminalDevice?
+    @State private var isApplyingSavedDevice: Bool = false
+    @State private var isDeviceListVisible: Bool = true
+    @State private var tabs: [XNetTerminalTab] = []
     @State private var selectedTabID: UUID? = nil
-    @State private var deviceSearch = ""
+    @State private var deviceSearch: String = ""
     @State private var expandedGroups: Set<String> = []
-    @State private var showingDeviceExporter = false
-    @State private var showingDeviceImporter = false
-    @State private var exportDocument = TerminalDeviceRegistryDocument()
-    @State private var exportFilename = "xnet-dispositivos.json"
-    @State private var importExportMessage: String?
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    @State private var savedSnippets: [TerminalSnippetEntry] = []
-    @State private var savedSessionLogs: [TerminalSessionLogEntry] = []
-    @State private var snippetSearch = ""
-    @State private var logSearch = ""
-    @State private var showingSnippetLibrary = false
-    @State private var showingLogHistory = false
-    @State private var editingSnippet: TerminalSnippetEntry?
+    @State private var selectedThemeID: String = TerminalThemeStore.readThemeID()
+    @State private var savedSnippets: [XNetTerminalSnippet] = []
+    @State private var savedSessionLogs: [XNetTerminalLog] = []
+    @State private var snippetSearch: String = ""
+    @State private var logSearch: String = ""
+    @State private var showingSnippetLibrary: Bool = false
+    @State private var showingLogHistory: Bool = false
+    @State private var editingSnippet: XNetTerminalSnippet?
     @State private var sessionStartDates: [UUID: Date] = [:]
     @State private var persistedLogSignatures: [UUID: String] = [:]
     
-    enum ConnectionType: String, CaseIterable, Identifiable {
-        case ssh = "SSH", telnet = "Telnet", serial = "Serial"
-        var id: String { self.rawValue }
+    var body: some View {
+        mainContent
+            .navigationTitle("")
+            .onAppear(perform: onAppear)
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TerminalDataReload"))) { _ in
+                reloadSavedDevices()
+                reloadSavedGroups()
+                refreshExpandedGroups()
+            }
+            .onChange(of: connectionType) { _, newValue in
+                if !isApplyingSavedDevice { updateDefaultPort(for: newValue) }
+                saveCurrentTabState()
+            }
+            .onChange(of: host) { _, _ in saveCurrentTabState() }
+            .onChange(of: port) { _, _ in saveCurrentTabState() }
+            .onChange(of: username) { _, _ in saveCurrentTabState() }
+            .onChange(of: savedPassword) { _, _ in saveCurrentTabState() }
+            .onChange(of: deviceSearch) { _, _ in refreshExpandedGroups() }
+            .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+                if let themeID = output.object as? String { selectedThemeID = themeID }
+                else { selectedThemeID = TerminalThemeStore.readThemeID() }
+            }
+            .onDisappear { persistLogIfNeeded(forTabID: selectedTabID) }
+            .sheet(isPresented: $showingDeviceForm, content: deviceFormSheet)
+            .sheet(isPresented: $showingGroupForm, content: groupFormSheet)
+            .sheet(isPresented: $showingSnippetLibrary, content: snippetLibrarySheet)
+            .sheet(isPresented: $showingLogHistory, content: logHistorySheet)
     }
     
-    var body: some View {
+    private var mainContent: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 20) {
-                tabBar
-                
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Shell Terminal")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(selectedTheme.foregroundColor)
-                        HStack(spacing: 8) {
-                            Image(systemName: manager.isConnected ? "waveform.path.ecg" : "bolt.horizontal")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(manager.isConnected ? .green : selectedTheme.mutedColor)
-                            Text(manager.isConnected ? "Sessão ativa via \(connectionType.rawValue)" : "Pronto para conectar")
-                                .font(.subheadline)
-                                .foregroundStyle(selectedTheme.mutedColor)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 12) {
-                        Button {
-                            editingDevice = nil
-                            showingDeviceForm = true
-                        } label: {
-                            Label("Novo", systemImage: "plus")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        Button {
-                            showingGroupForm = true
-                        } label: {
-                            Label("Nova Pasta", systemImage: "folder.badge.plus")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        Menu {
-                            Button("Exportar Cadastros") {
-                                prepareDeviceExport()
-                            }
-                            Button("Importar Cadastros") {
-                                showingDeviceImporter = true
-                            }
-                        } label: {
-                            Label("Cadastro", systemImage: "arrow.up.arrow.down.square")
-                        }
-                        .menuStyle(.borderedButton)
-                        .controlSize(.small)
-                        
-                        Button {
-                            guard let selectedDevice else { return }
-                            editingDevice = selectedDevice
-                            showingDeviceForm = true
-                        } label: {
-                            Label("Editar", systemImage: "square.and.pencil")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(selectedDevice == nil)
-                        
-                        Button(role: .destructive) {
-                            guard let selectedDevice else { return }
-                            deleteDevice(selectedDevice)
-                        } label: {
-                            Label("Excluir", systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(selectedDevice == nil)
-                        
-                        Button {
-                            isDeviceListVisible.toggle()
-                        } label: {
-                            Label(isDeviceListVisible ? "Ocultar Lista" : "Mostrar Lista", systemImage: isDeviceListVisible ? "sidebar.left" : "sidebar.right")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        
-                        Button {
-                            editingSnippet = nil
-                            showingSnippetLibrary = true
-                        } label: {
-                            Label("Snippets", systemImage: "terminal.textbox")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        Button {
-                            showingLogHistory = true
-                        } label: {
-                            Label("Logs", systemImage: "clock.arrow.circlepath")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        
-                        Picker("", selection: $connectionType) {
-                            ForEach(ConnectionType.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 160)
-                        
-                        Button(action: toggleConnection) {
-                            HStack {
-                                Image(systemName: manager.isConnected ? "stop.fill" : "bolt.fill")
-                                Text(manager.isConnected ? "Disconnect" : "Connect")
-                            }
-                            .frame(width: 100)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(manager.isConnected ? .red : selectedTheme.accentColor)
-                        .disabled(host.isEmpty && connectionType != .serial)
-                        .controlSize(.small)
-                    }
-                }
-                
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 32)
-            .padding(.bottom, 16)
-            .background(
-                LinearGradient(
-                    colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            
+            topBarSection
             Divider()
-                
-            HStack(spacing: 0) {
-                if isDeviceListVisible {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Dispositivos Salvos")
-                                .font(.headline)
-                                .foregroundStyle(selectedTheme.foregroundColor)
-                            Text("\(savedDevices.count)")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(selectedTheme.mutedColor)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.68))
-                                .clipShape(Capsule())
-                            Spacer()
-                            Button {
-                                editingDevice = nil
-                                showingDeviceForm = true
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                            
-                            Button {
-                                showingGroupForm = true
-                            } label: {
-                                Image(systemName: "folder.badge.plus")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        
-                        Divider()
-                        
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(selectedTheme.mutedColor)
-                            TextField("Buscar host, IP ou usuário", text: $deviceSearch)
-                                .textFieldStyle(.plain)
-                                .foregroundStyle(selectedTheme.foregroundColor)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.horizontal, 12)
-                        .padding(.top, 10)
-                        
-                        ScrollView {
-                            LazyVStack(spacing: 10) {
-                                ForEach(groupedFilteredSavedDevices, id: \.group) { groupItem in
-                                    VStack(spacing: 6) {
-                                        Button {
-                                            toggleGroup(groupItem.group)
-                                        } label: {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: expandedGroups.contains(groupItem.group) ? "folder.fill" : "folder")
-                                                    .foregroundStyle(selectedTheme.mutedColor)
-                                                Text(groupItem.group)
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundStyle(selectedTheme.foregroundColor)
-                                                Text("\(groupItem.devices.count)")
-                                                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(selectedTheme.mutedColor)
-                                                    .padding(.horizontal, 7)
-                                                    .padding(.vertical, 2)
-                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.7))
-                                                    .clipShape(Capsule())
-                                                Spacer()
-                                                Image(systemName: expandedGroups.contains(groupItem.group) ? "chevron.down" : "chevron.right")
-                                                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(selectedTheme.mutedColor)
-                                            }
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 7)
-            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.52))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        }
-                                        .buttonStyle(.plain)
-                                        
-                                        if expandedGroups.contains(groupItem.group) {
-                                            VStack(spacing: 8) {
-                                                ForEach(groupItem.devices) { device in
-                                                    deviceRow(device)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 10)
-                        }
-                    }
-                    .frame(width: 300)
-                    .background(
-                        LinearGradient(
-                            colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    
-                    Divider()
-                }
-                ZStack(alignment: .topLeading) {
-                    selectedTheme.backgroundColor
-                    
-                    
-                    if manager.isConnected {
-                        InteractiveTerminalTextView(text: $manager.logs, theme: selectedTheme) { input in
-                            manager.sendRaw(input)
-                        }
-                    } else {
-                        terminalPlaceholder
-                    }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.65 : 0.7), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(10)
-            }
+            contentSection
         }
         .background(
             LinearGradient(
-                colors: [
-                    selectedTheme.chromeTopColor,
-                    selectedTheme.chromeBottomColor
-                ],
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
-        .navigationTitle("")
-        .onAppear {
-            reloadSavedDevices()
-            reloadSavedGroups()
-            reloadSnippets()
-            reloadSessionLogs()
-            refreshExpandedGroups()
-            if connectionType == .serial {
-                availableSerialPorts = manager.getAvailableSerialPorts()
-            }
-        }
-        .onChange(of: connectionType) { _, newValue in
-            if !isApplyingSavedDevice {
-                updateDefaultPort(for: newValue)
-            }
-            saveCurrentTabState()
-        }
-        .onChange(of: host) { _, _ in saveCurrentTabState() }
-        .onChange(of: port) { _, _ in saveCurrentTabState() }
-        .onChange(of: username) { _, _ in saveCurrentTabState() }
-        .onChange(of: savedPassword) { _, _ in saveCurrentTabState() }
-        .onChange(of: deviceSearch) { _, _ in
-            refreshExpandedGroups()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            } else {
-                selectedThemeID = TerminalThemeStore.readThemeID()
-            }
-        }
-        .onDisappear {
-            persistLogIfNeeded(forTabID: selectedTabID)
-        }
-        .sheet(isPresented: $showingDeviceForm) {
-            TerminalDeviceFormSheet(deviceToEdit: editingDevice, availableGroups: formGroupOptions) { payload in
-                saveDevice(payload)
-            }
-        }
-        .sheet(isPresented: $showingGroupForm) {
-            TerminalDeviceGroupFormSheet { name in
-                createGroup(named: name)
-            }
-        }
-        .sheet(isPresented: $showingSnippetLibrary) {
-            TerminalSnippetLibrarySheet(
-                snippets: filteredSnippets,
-                searchText: $snippetSearch,
-                canSend: manager.isConnected,
-                onAdd: {
-                    editingSnippet = nil
-                },
-                onEdit: { snippet in
-                    editingSnippet = snippet
-                },
-                onDelete: { snippet in
-                    deleteSnippet(snippet)
-                },
-                onSend: { snippet in
-                    sendSnippet(snippet)
-                },
-                onSave: { payload in
-                    saveSnippet(payload)
-                },
-                editingSnippet: editingSnippet
-            )
-        }
-        .sheet(isPresented: $showingLogHistory) {
-            TerminalLogHistorySheet(
-                logs: filteredSessionLogs,
-                searchText: $logSearch,
-                onDelete: { entry in
-                    deleteLogEntry(entry)
-                },
-                onClear: {
-                    clearSavedLogs()
+    }
+    
+    @ViewBuilder
+    private func deviceFormSheet() -> some View {
+        TerminalDeviceFormSheet(deviceToEdit: editingDevice, availableGroups: formGroupOptions) { saveDevice($0) }
+    }
+    
+    @ViewBuilder
+    private func groupFormSheet() -> some View {
+        TerminalDeviceGroupFormSheet { createGroup(named: $0) }
+    }
+    
+    @ViewBuilder
+    private func snippetLibrarySheet() -> some View {
+        TerminalSnippetLibrarySheet(
+            snippets: filteredSnippets,
+            searchText: $snippetSearch,
+            canSend: manager.isConnected,
+            onAdd: { editingSnippet = nil },
+            onEdit: { editingSnippet = $0 },
+            onDelete: { deleteSnippet($0) },
+            onSend: { sendSnippet($0) },
+            onSave: { saveSnippet($0) },
+            editingSnippet: editingSnippet
+        )
+    }
+    
+    @ViewBuilder
+    private func logHistorySheet() -> some View {
+        TerminalLogHistorySheet(
+            logs: filteredSessionLogs,
+            searchText: $logSearch,
+            onDelete: { deleteLogEntry($0) },
+            onClear: { clearSavedLogs() }
+        )
+    }
+    
+    private var topBarSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            tabBar
+            
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Shell Terminal")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    HStack(spacing: 8) {
+                        Image(systemName: manager.isConnected ? "waveform.path.ecg" : "bolt.horizontal")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(manager.isConnected ? .green : selectedTheme.mutedColor)
+                        Text(manager.isConnected ? "Sessão ativa via \(connectionType.rawValue)" : "Pronto para conectar")
+                            .font(.subheadline)
+                            .foregroundStyle(selectedTheme.mutedColor)
+                    }
                 }
-            )
-        }
-        .fileExporter(
-            isPresented: $showingDeviceExporter,
-            document: exportDocument,
-            contentType: .json,
-            defaultFilename: exportFilename
-        ) { result in
-            switch result {
-            case .success:
-                importExportMessage = "Cadastros exportados com sucesso."
-            case .failure(let error):
-                importExportMessage = "Falha ao exportar: \(error.localizedDescription)"
+                Spacer()
+                quickAccessBar
+            }
+                
+            HStack(spacing: 8) {
+                Group {
+                    Button {
+                        editingDevice = nil
+                        showingDeviceForm = true
+                    } label: { Image(systemName: "plus") }.help("Novo Dispositivo")
+                    
+                    Button {
+                        showingGroupForm = true
+                    } label: { Image(systemName: "folder.badge.plus") }.help("Nova Pasta")
+                    
+                    Divider().frame(height: 16).padding(.horizontal, 4)
+                    
+                    Button {
+                        isDeviceListVisible.toggle()
+                    } label: { Image(systemName: isDeviceListVisible ? "sidebar.left" : "sidebar.right") }.help("Alternar Lateral")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                Spacer()
+                
+                Group {
+                    Button {
+                        editingSnippet = nil
+                        showingSnippetLibrary = true
+                    } label: { Image(systemName: "terminal.textbox") }.help("Snippets")
+                    
+                    Button {
+                        showingLogHistory = true
+                    } label: { Image(systemName: "clock.arrow.circlepath") }.help("Histórico de Logs")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
-        .fileImporter(
-            isPresented: $showingDeviceImporter,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false
-        ) { result in
-            handleDeviceImport(result)
+        .padding(.horizontal, 28)
+        .padding(.top, 32)
+        .padding(.bottom, 16)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+    
+    private var contentSection: some View {
+        HStack(spacing: 0) {
+            if isDeviceListVisible {
+                TerminalSidebarView(
+                    savedDevices: $savedDevices,
+                    expandedGroups: $expandedGroups,
+                    deviceSearch: $deviceSearch,
+                    selectedDeviceID: $selectedDeviceID,
+                    theme: selectedTheme,
+                    groupedFilteredSavedDevices: groupedFilteredSavedDevices,
+                    onToggleGroup: toggleGroup,
+                    onEditDevice: { dev in
+                        selectedDeviceID = dev.id
+                        editingDevice = dev
+                        showingDeviceForm = true
+                    },
+                    onConnectDevice: connectFromDevice,
+                    onOpenNewTab: openDeviceInNewTab,
+                    onDeleteDevice: deleteDevice,
+                    onAddNewDevice: {
+                        editingDevice = nil
+                        showingDeviceForm = true
+                    },
+                    onAddNewGroup: { showingGroupForm = true }
+                )
+                
+                Divider()
+            }
+            
+            ZStack(alignment: .topLeading) {
+                selectedTheme.backgroundColor
+                
+                if manager.isConnected {
+                    InteractiveTerminalTextView(text: $manager.logs, theme: selectedTheme) { manager.sendRaw($0) }
+                } else {
+                    terminalPlaceholder
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.65 : 0.7), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(10)
         }
-        .alert("Cadastro de Dispositivos", isPresented: Binding(
-            get: { importExportMessage != nil },
-            set: { if !$0 { importExportMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(importExportMessage ?? "")
+    }
+    
+    private var quickAccessBar: some View {
+        HStack(spacing: 8) {
+            Picker("", selection: $connectionType) {
+                ForEach(XNetTerminalConnectionType.allCases) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
+            
+            HStack(spacing: 6) {
+                if connectionType == .serial {
+                    Picker("Porta Serial", selection: $host) {
+                        if availableSerialPorts.isEmpty { Text("Nenhuma porta").tag("") }
+                        ForEach(availableSerialPorts, id: \.self) { Text($0).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    TextField("Host / IP", text: $host)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13, design: .monospaced))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(selectedTheme.backgroundColor.opacity(0.35))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                
+                TextField("Porta", text: $port)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(width: 60)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(selectedTheme.backgroundColor.opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                if connectionType == .ssh {
+                    TextField("Usuário", text: $username)
+                        .textFieldStyle(.plain)
+                        .background(selectedTheme.backgroundColor.opacity(0.35))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .font(.system(size: 13)).padding(.horizontal, 10).padding(.vertical, 7)
+                }
+                
+                if connectionType != .serial {
+                    SecureField("Senha", text: $savedPassword)
+                        .textFieldStyle(.plain)
+                        .background(selectedTheme.backgroundColor.opacity(0.35))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .font(.system(size: 13)).padding(.horizontal, 10).padding(.vertical, 7)
+                }
+                
+                Button(action: toggleConnection) {
+                    HStack(spacing: 6) {
+                        Image(systemName: manager.isConnected ? "stop.fill" : "bolt.fill").font(.system(size: 11, weight: .bold))
+                        Text(manager.isConnected ? "Desconectar" : "Conectar").font(.system(size: 12, weight: .bold))
+                    }.frame(minWidth: 90)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(manager.isConnected ? .red : selectedTheme.accentColor)
+                .disabled(host.isEmpty && connectionType != .serial)
+            }
+            .padding(6)
+            .background(selectedTheme.cardBackgroundColor.opacity(0.25))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -433,37 +302,23 @@ struct TerminalView: View {
         TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
     }
     
-    private var filteredSnippets: [TerminalSnippetEntry] {
+    private var filteredSnippets: [XNetTerminalSnippet] {
         let term = snippetSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else {
-            return savedSnippets.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-        return savedSnippets
-            .filter {
-                $0.title.localizedCaseInsensitiveContains(term)
-                || $0.command.localizedCaseInsensitiveContains(term)
-                || $0.notes.localizedCaseInsensitiveContains(term)
-            }
-            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        guard !term.isEmpty else { return savedSnippets.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending } }
+        return savedSnippets.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.command.localizedCaseInsensitiveContains(term) }.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
     
-    private var filteredSessionLogs: [TerminalSessionLogEntry] {
+    private var filteredSessionLogs: [XNetTerminalLog] {
         let term = logSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return savedSessionLogs }
-        return savedSessionLogs.filter {
-            $0.title.localizedCaseInsensitiveContains(term)
-            || $0.host.localizedCaseInsensitiveContains(term)
-            || $0.username.localizedCaseInsensitiveContains(term)
-            || $0.connectionType.localizedCaseInsensitiveContains(term)
-            || $0.content.localizedCaseInsensitiveContains(term)
-        }
+        return savedSessionLogs.filter { $0.title.localizedCaseInsensitiveContains(term) || $0.content.localizedCaseInsensitiveContains(term) }
     }
 
     private var tabBar: some View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(tabs) { tab in
+                    ForEach(tabs) { (tab: XNetTerminalTab) in
                         HStack(spacing: 6) {
                             Button {
                                 saveCurrentTabState()
@@ -471,64 +326,43 @@ struct TerminalView: View {
                                 loadTab(tab)
                             } label: {
                                 HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(tab.manager.isConnected ? Color.green : Color.secondary.opacity(0.45))
-                                        .frame(width: 7, height: 7)
-                                    Text(tab.displayName)
-                                        .lineLimit(1)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(selectedTheme.foregroundColor)
+                                    Circle().fill(tab.manager.isConnected ? Color.green : Color.secondary.opacity(0.45)).frame(width: 7, height: 7)
+                                    Text(tab.displayName).lineLimit(1).font(.system(size: 12, weight: .medium)).foregroundStyle(selectedTheme.foregroundColor)
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(selectedTabID == tab.id ? selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.18 : 0.24) : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.82 : 0.58))
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(selectedTabID == tab.id ? selectedTheme.accentColor.opacity(0.2) : selectedTheme.cardBackgroundColor.opacity(0.5))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
                             
-                            Button {
-                                closeTab(tab.id)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(selectedTheme.mutedColor)
-                            }
-                            .buttonStyle(.plain)
+                            Button { closeTab(tab.id) } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(selectedTheme.mutedColor) }.buttonStyle(.plain)
                         }
                     }
                 }
             }
-            
-            Button {
-                addTab()
-            } label: {
-                Label("Nova Aba", systemImage: "plus")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            Button(action: addTab) { Label("Nova Aba", systemImage: "plus") }.buttonStyle(.bordered).controlSize(.small)
         }
-        .padding(8)
-        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.52))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.4 : 0.5), lineWidth: 1)
-        )
+        .padding(8).background(selectedTheme.cardBackgroundColor.opacity(0.5)).clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var terminalPlaceholder: some View {
         VStack(spacing: 20) {
-            Image(systemName: "powershell")
-                .font(.system(size: 40))
-                .foregroundStyle(selectedTheme.foregroundColor.opacity(0.28))
-            Text("Ready to connect...")
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(selectedTheme.foregroundColor.opacity(0.54))
+            Image(systemName: "powershell").font(.system(size: 40)).foregroundStyle(selectedTheme.foregroundColor.opacity(0.28))
+            Text("Ready to connect...").font(.system(.body, design: .monospaced)).foregroundStyle(selectedTheme.foregroundColor.opacity(0.54))
         }
     }
 
+    private func onAppear() {
+        reloadSavedDevices()
+        reloadSavedGroups()
+        reloadSnippets()
+        reloadSessionLogs()
+        refreshExpandedGroups()
+        if connectionType == .serial { availableSerialPorts = manager.getAvailableSerialPorts() }
+    }
+
     private func saveCurrentTabState() {
-        guard let selectedTabID, let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        guard let sID = selectedTabID, let index = tabs.firstIndex(where: { $0.id == sID }) else { return }
         tabs[index].connectionType = connectionType
         tabs[index].host = host
         tabs[index].port = port
@@ -536,15 +370,13 @@ struct TerminalView: View {
         tabs[index].password = savedPassword
         tabs[index].availableSerialPorts = availableSerialPorts
         tabs[index].manager = manager
-        tabs[index].sessionStartedAt = sessionStartDates[selectedTabID]
-        tabs[index].persistedLogSignature = persistedLogSignatures[selectedTabID]
+        tabs[index].sessionStartedAt = sessionStartDates[sID]
+        tabs[index].persistedLogSignature = persistedLogSignatures[sID]
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedHost.isEmpty {
-            tabs[index].name = trimmedHost
-        }
+        if !trimmedHost.isEmpty { tabs[index].name = trimmedHost }
     }
     
-    private func loadTab(_ tab: TerminalTabItem) {
+    private func loadTab(_ tab: XNetTerminalTab) {
         connectionType = tab.connectionType
         host = tab.host
         port = tab.port
@@ -558,7 +390,7 @@ struct TerminalView: View {
     
     private func addTab() {
         saveCurrentTabState()
-        let tab = TerminalTabItem(name: "Sessão \(tabs.count + 1)")
+        let tab = XNetTerminalTab(name: "Sessão \(tabs.count + 1)")
         tabs.append(tab)
         sessionStartDates[tab.id] = nil
         persistedLogSignatures[tab.id] = nil
@@ -575,23 +407,13 @@ struct TerminalView: View {
         sessionStartDates.removeValue(forKey: id)
         persistedLogSignatures.removeValue(forKey: id)
         if tabs.isEmpty {
-            selectedTabID = nil
-            manager = TerminalConnectionManager()
-            host = ""
-            port = "22"
-            username = ""
-            savedPassword = ""
-            availableSerialPorts = []
+            selectedTabID = nil; manager = TerminalConnectionManager(); host = ""; port = "22"; username = ""; savedPassword = ""; availableSerialPorts = []
             return
         }
-        if selectedTabID == id {
-            let fallback = tabs[min(index, tabs.count - 1)]
-            selectedTabID = fallback.id
-            loadTab(fallback)
-        }
+        if selectedTabID == id { let fallback = tabs[min(index, tabs.count - 1)]; selectedTabID = fallback.id; loadTab(fallback) }
     }
     
-    private func updateDefaultPort(for type: ConnectionType) {
+    private func updateDefaultPort(for type: XNetTerminalConnectionType) {
         switch type {
         case .ssh: port = "22"
         case .telnet: port = "23"
@@ -603,127 +425,63 @@ struct TerminalView: View {
     }
     
     private func toggleConnection() {
-        if manager.isConnected {
-            persistLogIfNeeded(forTabID: selectedTabID)
-            manager.disconnect()
-        } else {
-            connectUsingCurrentFields()
-        }
+        if manager.isConnected { persistLogIfNeeded(forTabID: selectedTabID); manager.disconnect() }
+        else { connectUsingCurrentFields() }
     }
     
     private func connectUsingCurrentFields() {
         ensureActiveTabForCurrentSession()
         persistLogIfNeeded(forTabID: selectedTabID)
         manager.logs = ""
-        if let selectedTabID {
-            sessionStartDates[selectedTabID] = Date()
-            persistedLogSignatures[selectedTabID] = nil
-        }
+        if let tabID = selectedTabID { sessionStartDates[tabID] = Date(); persistedLogSignatures[tabID] = nil }
         switch connectionType {
-        case .ssh:
-            manager.setSSHPassword(savedPassword)
-            manager.connectSSH(host: host, port: port, user: username)
-        case .telnet:
-            manager.setTelnetPassword(savedPassword)
-            manager.connectTelnet(host: host, port: port)
-        case .serial:
-            if let baud = Int(port) {
-                manager.connectSerial(portPath: host, baudRate: baud)
-            }
+        case .ssh: manager.setSSHPassword(savedPassword); manager.connectSSH(host: host, port: port, user: username)
+        case .telnet: manager.setTelnetPassword(savedPassword); manager.connectTelnet(host: host, port: port)
+        case .serial: if let baud = Int(port) { manager.connectSerial(portPath: host, baudRate: baud) }
         }
     }
     
     private func ensureActiveTabForCurrentSession() {
         guard selectedTabID == nil else { return }
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        let tab = TerminalTabItem(name: trimmedHost.isEmpty ? "Sessão 1" : trimmedHost)
+        let tab = XNetTerminalTab(name: trimmedHost.isEmpty ? "Sessão 1" : trimmedHost)
         tabs.append(tab)
         selectedTabID = tab.id
-        sessionStartDates[tab.id] = nil
-        persistedLogSignatures[tab.id] = nil
-        saveCurrentTabState()
+        sessionStartDates[tab.id] = nil; persistedLogSignatures[tab.id] = nil; saveCurrentTabState()
     }
     
     private func persistLogIfNeeded(forTabID tabID: UUID?) {
-        guard let tabID else { return }
+        guard let tID = tabID else { return }
         saveCurrentTabState()
-        let activeTab = tabs.first(where: { $0.id == tabID })
-        let logSource = (selectedTabID == tabID ? manager.logs : activeTab?.manager.logs) ?? ""
-        let sanitized = logSource.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activeTab = tabs.first(where: { $0.id == tID })
+        let logSource: String = (selectedTabID == tID ? manager.logs : activeTab?.manager.logs) ?? ""
+        let sanitized: String = logSource.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sanitized.isEmpty else { return }
-        
-        let activeConnectionType = activeTab?.connectionType ?? connectionType
-        let activeHost = activeTab?.host ?? host
-        let activePort = activeTab?.port ?? port
-        let activeUsername = activeTab?.username ?? username
-        let activeName = activeTab?.name ?? "Sessão"
-        let startedAt = sessionStartDates[tabID] ?? activeTab?.sessionStartedAt ?? Date()
-        let signature = "\(activeConnectionType.rawValue)|\(activeHost)|\(activePort)|\(activeUsername)|\(sanitized)"
-        
-        if persistedLogSignatures[tabID] == signature {
-            return
-        }
-        
-        let entry = TerminalSessionLogEntry(
-            id: UUID(),
-            title: activeName,
-            connectionType: activeConnectionType.rawValue,
-            host: activeHost,
-            port: activePort,
-            username: activeUsername,
-            startedAt: startedAt,
-            endedAt: Date(),
-            content: sanitized
-        )
-        savedSessionLogs.insert(entry, at: 0)
-        if savedSessionLogs.count > 150 {
-            savedSessionLogs = Array(savedSessionLogs.prefix(150))
-        }
-        persistedLogSignatures[tabID] = signature
-        if let index = tabs.firstIndex(where: { $0.id == tabID }) {
-            tabs[index].persistedLogSignature = signature
-            tabs[index].sessionStartedAt = startedAt
-        }
+        let signature = "\(activeTab?.connectionType.rawValue ?? connectionType.rawValue)|\(activeTab?.host ?? host)|\(sanitized.count)"
+        if persistedLogSignatures[tID] == signature { return }
+        let entry = XNetTerminalLog(id: UUID(), title: activeTab?.name ?? "Sessão", connectionType: activeTab?.connectionType.rawValue ?? connectionType.rawValue, host: activeTab?.host ?? host, port: activeTab?.port ?? port, username: activeTab?.username ?? username, startedAt: sessionStartDates[tID] ?? activeTab?.sessionStartedAt ?? Date(), endedAt: Date(), content: sanitized)
+        savedSessionLogs.insert(entry, at: 0); if savedSessionLogs.count > 150 { savedSessionLogs = Array(savedSessionLogs.prefix(150)) }
+        persistedLogSignatures[tID] = signature; if let index = tabs.firstIndex(where: { $0.id == tID }) { tabs[index].persistedLogSignature = signature; tabs[index].sessionStartedAt = sessionStartDates[tID] ?? Date() }
         persistSessionLogCache()
     }
     
-    private var selectedDevice: TerminalDeviceEntry? {
-        guard let selectedDeviceID else { return nil }
-        return savedDevices.first(where: { $0.id == selectedDeviceID })
-    }
-    
-    private var filteredSavedDevices: [TerminalDeviceEntry] {
+    private var filteredSavedDevices: [XNetTerminalDevice] {
         let term = deviceSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return savedDevices }
-        return savedDevices.filter {
-            $0.name.localizedCaseInsensitiveContains(term)
-            || $0.host.localizedCaseInsensitiveContains(term)
-            || $0.username.localizedCaseInsensitiveContains(term)
-            || $0.connectionType.localizedCaseInsensitiveContains(term)
-            || normalizedGroupName($0.groupName).localizedCaseInsensitiveContains(term)
-        }
+        return savedDevices.filter { $0.name.localizedCaseInsensitiveContains(term) || $0.host.localizedCaseInsensitiveContains(term) }
     }
     
-    private var groupedFilteredSavedDevices: [(group: String, devices: [TerminalDeviceEntry])] {
+    private var groupedFilteredSavedDevices: [(group: String, devices: [XNetTerminalDevice])] {
         let grouped = Dictionary(grouping: filteredSavedDevices) { normalizedGroupName($0.groupName) }
-        let term = deviceSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        let groupNames = allGroupNames.filter { group in
-            if term.isEmpty { return true }
-            return group.localizedCaseInsensitiveContains(term) || !(grouped[group] ?? []).isEmpty
-        }
-        return groupNames.map { key in
-            let devices = (grouped[key] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            return (group: key, devices: devices)
-        }
+        let groupNames = allGroupNames.filter { group in deviceSearch.isEmpty || group.localizedCaseInsensitiveContains(deviceSearch) || !(grouped[group] ?? []).isEmpty }
+        return groupNames.map { (group: $0, devices: (grouped[$0] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) }
     }
     
     private var allGroupNames: [String] {
-        let merged = savedGroups + savedDevices.map(\.groupName) + ["Geral"]
+        let merged = savedGroups + savedDevices.map { $0.groupName } + ["Geral"]
         var unique: [String] = []
-        for name in merged.map(normalizedGroupName(_:)) {
-            if !unique.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
-                unique.append(name)
-            }
+        for name in merged.map({ normalizedGroupName($0) }) {
+            if !unique.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) { unique.append(name) }
         }
         return unique.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
@@ -732,1417 +490,79 @@ struct TerminalView: View {
         var options = allGroupNames
         if let editingDevice {
             let normalized = normalizedGroupName(editingDevice.groupName)
-            if !options.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
-                options.append(normalized)
-            }
+            if !options.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) { options.append(normalized) }
         }
         return options.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
     
-    private func applyDevice(_ device: TerminalDeviceEntry) {
-        isApplyingSavedDevice = true
-        connectionType = ConnectionType(rawValue: device.connectionType) ?? .ssh
-        host = device.host
-        port = device.port
-        username = device.username
-        savedPassword = resolvePassword(for: device)
-        if connectionType == .serial {
-            availableSerialPorts = manager.getAvailableSerialPorts()
-            if !availableSerialPorts.contains(host), !host.isEmpty {
-                availableSerialPorts.insert(host, at: 0)
-            }
-        }
-        DispatchQueue.main.async {
-            isApplyingSavedDevice = false
-        }
+    private func applyDevice(_ device: XNetTerminalDevice) {
+        isApplyingSavedDevice = true; connectionType = XNetTerminalConnectionType(rawValue: device.connectionType) ?? .ssh; host = device.host; port = device.port; username = device.username; savedPassword = resolvePassword(for: device)
+        if connectionType == .serial { availableSerialPorts = manager.getAvailableSerialPorts(); if !availableSerialPorts.contains(host), !host.isEmpty { availableSerialPorts.insert(host, at: 0) } }
+        DispatchQueue.main.async { isApplyingSavedDevice = false }
     }
     
-    private func connectFromDevice(_ device: TerminalDeviceEntry) {
-        if manager.isConnected {
-            manager.disconnect()
-        }
-        applyDevice(device)
-        DispatchQueue.main.async {
-            connectUsingCurrentFields()
-        }
+    private func connectFromDevice(_ device: XNetTerminalDevice) {
+        if manager.isConnected { manager.disconnect() }
+        applyDevice(device); DispatchQueue.main.async { connectUsingCurrentFields() }
     }
     
-    private func openDeviceInNewTab(_ device: TerminalDeviceEntry) {
-        saveCurrentTabState()
-        let newTab = TerminalTabItem(name: device.name)
-        tabs.append(newTab)
-        selectedTabID = newTab.id
-        loadTab(newTab)
-        applyDevice(device)
-        connectUsingCurrentFields()
-        saveCurrentTabState()
+    private func openDeviceInNewTab(_ device: XNetTerminalDevice) {
+        saveCurrentTabState(); let newTab = XNetTerminalTab(name: device.name); tabs.append(newTab); selectedTabID = newTab.id; loadTab(newTab); applyDevice(device); connectUsingCurrentFields(); saveCurrentTabState()
     }
+    
+    private func normalizedGroupName(_ name: String) -> String { let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines); return trimmed.isEmpty ? "Geral" : trimmed }
+    
+    private func reloadSavedDevices() { guard let data = UserDefaults.standard.data(forKey: XNetTerminalDevice.storageKey), let cached = try? JSONDecoder().decode([XNetTerminalDevice].self, from: data) else { return }; savedDevices = cached }
+    private func reloadSavedGroups() { guard let data = UserDefaults.standard.data(forKey: TerminalDeviceGroupStore.storageKey), let cached = try? JSONDecoder().decode([String].self, from: data) else { return }; savedGroups = cached }
+    private func reloadSnippets() { guard let data = UserDefaults.standard.data(forKey: TerminalSnippetStore.storageKey), let cached = try? JSONDecoder().decode([XNetTerminalSnippet].self, from: data) else { return }; savedSnippets = cached }
+    private func reloadSessionLogs() { guard let data = UserDefaults.standard.data(forKey: TerminalSessionLogStore.storageKey), let cached = try? JSONDecoder().decode([XNetTerminalLog].self, from: data) else { return }; savedSessionLogs = cached }
     
     private func saveDevice(_ payload: TerminalDevicePayload) {
-        let normalizedGroup = normalizedGroupName(payload.groupName)
-        ensureGroupExists(named: normalizedGroup)
-        let credentialID = normalizedCredentialID(existing: editingDevice?.credentialID)
-        let entry = TerminalDeviceEntry(
-            id: editingDevice?.id ?? UUID(),
-            name: payload.name,
-            groupName: normalizedGroup,
-            connectionType: payload.connectionType,
-            host: payload.host,
-            port: payload.port,
-            username: payload.username,
-            notes: payload.notes,
-            credentialID: credentialID
-        )
-        
-        if let index = savedDevices.firstIndex(where: { $0.id == entry.id }) {
-            savedDevices[index] = entry
-        } else {
-            savedDevices.append(entry)
-        }
-        savedDevices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        selectedDeviceID = entry.id
-        persistSavedDevicesCache()
-        refreshExpandedGroups()
-        
-        if payload.password.isEmpty {
-            credentialCandidates(for: entry).forEach { TerminalPasswordStore.deletePassword(credentialID: $0) }
-        } else {
-            let allSaved = credentialCandidates(for: entry).allSatisfy { candidateID in
-                TerminalPasswordStore.savePassword(payload.password, credentialID: candidateID)
-            }
-            if !allSaved {
-                manager.logs += "\n[Credential Save Error]\n"
-            }
-        }
-        
-        syncEntryToDatabase(entry)
-        NotificationCenter.default.post(name: Notification.Name("TerminalDevicesUpdated"), object: nil)
-        editingDevice = nil
+        let entry = XNetTerminalDevice(id: editingDevice?.id ?? UUID(), name: payload.name, groupName: payload.groupName, connectionType: payload.connectionType, host: payload.host, port: payload.port, username: payload.username, credentialID: "", notes: payload.notes, createdAt: editingDevice?.createdAt ?? Date())
+        _ = TerminalPasswordStore.savePassword(payload.password, credentialID: normalizedCredentialID(for: entry))
+        if let index = savedDevices.firstIndex(where: { $0.id == entry.id }) { savedDevices[index] = entry } else { savedDevices.append(entry) }
+        persistDevicesCache()
     }
     
-    private func deleteDevice(_ device: TerminalDeviceEntry) {
-        credentialCandidates(for: device).forEach { TerminalPasswordStore.deletePassword(credentialID: $0) }
-        savedDevices.removeAll { $0.id == device.id }
-        persistSavedDevicesCache()
-        refreshExpandedGroups()
-        
-        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
-        if let records = try? modelContext.fetch(descriptor) {
-            if let dbRecord = records.first(where: { $0.credentialID == device.credentialID }) {
-                modelContext.delete(dbRecord)
-                do {
-                    try modelContext.save()
-                } catch {
-                    manager.logs += "\n[Database Delete Error]: \(error.localizedDescription)\n"
-                }
-            }
-        }
-        
-        if selectedDeviceID == device.id {
-            selectedDeviceID = nil
-        }
-        NotificationCenter.default.post(name: Notification.Name("TerminalDevicesUpdated"), object: nil)
-    }
-    
-    private func reloadSavedDevices() {
-        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
-        do {
-            let rows = try modelContext.fetch(descriptor)
-            if !rows.isEmpty {
-                savedDevices = rows.map {
-                    TerminalDeviceEntry(
-                        id: UUID(),
-                        name: $0.name,
-                        groupName: $0.groupName,
-                        connectionType: $0.connectionType,
-                        host: $0.host,
-                        port: $0.port,
-                        username: $0.username,
-                        notes: $0.notes,
-                        credentialID: $0.credentialID
-                    )
-                }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-                persistSavedDevicesCache()
-                refreshExpandedGroups()
-                return
-            }
-        } catch {
-            manager.logs += "\n[Database Fetch Error]: \(error.localizedDescription)\n"
-        }
-        
-        if let data = UserDefaults.standard.data(forKey: TerminalDeviceEntry.storageKey),
-           let cached = try? JSONDecoder().decode([TerminalDeviceEntry].self, from: data),
-           !cached.isEmpty {
-            savedDevices = cached.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        } else {
-            savedDevices = []
-        }
-        refreshExpandedGroups()
-    }
-    
-    private func reloadSavedGroups() {
-        let descriptor = FetchDescriptor<TerminalDeviceGroup>(sortBy: [SortDescriptor(\.name, order: .forward)])
-        var names = ((try? modelContext.fetch(descriptor)) ?? []).map(\.name)
-        
-        if names.isEmpty,
-           let data = UserDefaults.standard.data(forKey: TerminalDeviceGroupStore.storageKey),
-           let cached = try? JSONDecoder().decode([String].self, from: data) {
-            names = cached
-        }
-        
-        let normalized = normalizedGroupCollection(names + savedDevices.map(\.groupName) + ["Geral"])
-        savedGroups = normalized
-        persistGroupCache()
-        syncGroupsToDatabase(normalized)
-    }
-    
-    private func syncEntryToDatabase(_ entry: TerminalDeviceEntry) {
-        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.name, order: .forward)])
-        do {
-            let rows = try modelContext.fetch(descriptor)
-            if let existing = rows.first(where: { $0.credentialID == entry.credentialID }) {
-                existing.name = entry.name
-                existing.groupName = normalizedGroupName(entry.groupName)
-                existing.connectionType = entry.connectionType
-                existing.host = entry.host
-                existing.port = entry.port
-                existing.username = entry.username
-                existing.notes = entry.notes
-            } else {
-                let row = TerminalDevice(
-                    name: entry.name,
-                    groupName: normalizedGroupName(entry.groupName),
-                    connectionType: entry.connectionType,
-                    host: entry.host,
-                    port: entry.port,
-                    username: entry.username,
-                    notes: entry.notes,
-                    credentialID: entry.credentialID
-                )
-                modelContext.insert(row)
-            }
-            try modelContext.save()
-        } catch {
-            manager.logs += "\n[Database Save Error]: \(error.localizedDescription)\n"
-        }
-    }
-    
-    private func persistSavedDevicesCache() {
-        if let data = try? JSONEncoder().encode(savedDevices) {
-            UserDefaults.standard.set(data, forKey: TerminalDeviceEntry.storageKey)
-        }
-    }
-    
-    private func persistGroupCache() {
-        if let data = try? JSONEncoder().encode(savedGroups) {
-            UserDefaults.standard.set(data, forKey: TerminalDeviceGroupStore.storageKey)
-        }
-    }
-    
-    private func reloadSnippets() {
-        guard let data = UserDefaults.standard.data(forKey: TerminalSnippetStore.storageKey),
-              let cached = try? JSONDecoder().decode([TerminalSnippetEntry].self, from: data) else {
-            savedSnippets = []
-            return
-        }
-        savedSnippets = cached.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
-    
-    private func persistSnippetCache() {
-        if let data = try? JSONEncoder().encode(savedSnippets) {
-            UserDefaults.standard.set(data, forKey: TerminalSnippetStore.storageKey)
-        }
-    }
+    private func createGroup(named name: String) { let normalized = normalizedGroupName(name); if !savedGroups.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) { savedGroups.append(normalized); persistGroupsCache() } }
+    private func deleteDevice(_ device: XNetTerminalDevice) { savedDevices.removeAll(where: { $0.id == device.id }); persistDevicesCache(); TerminalPasswordStore.deletePassword(credentialID: normalizedCredentialID(for: device)) }
     
     private func saveSnippet(_ payload: TerminalSnippetPayload) {
-        let trimmedTitle = payload.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCommand = payload.command.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedTitle.isEmpty, !trimmedCommand.isEmpty else { return }
-        
-        let entry = TerminalSnippetEntry(
-            id: editingSnippet?.id ?? UUID(),
-            title: trimmedTitle,
-            command: payload.command,
-            notes: payload.notes.trimmingCharacters(in: .whitespacesAndNewlines),
-            sendReturn: payload.sendReturn
-        )
-        
-        if let index = savedSnippets.firstIndex(where: { $0.id == entry.id }) {
-            savedSnippets[index] = entry
-        } else {
-            savedSnippets.append(entry)
-        }
-        savedSnippets.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        let entry = XNetTerminalSnippet(id: editingSnippet?.id ?? UUID(), title: payload.title, command: payload.command, notes: payload.notes, sendReturn: payload.sendReturn)
+        if let index = savedSnippets.firstIndex(where: { $0.id == entry.id }) { savedSnippets[index] = entry } else { savedSnippets.append(entry) }
         persistSnippetCache()
-        editingSnippet = nil
     }
     
-    private func deleteSnippet(_ snippet: TerminalSnippetEntry) {
-        savedSnippets.removeAll { $0.id == snippet.id }
-        persistSnippetCache()
-        if editingSnippet?.id == snippet.id {
-            editingSnippet = nil
-        }
-    }
+    private func deleteSnippet(_ snippet: XNetTerminalSnippet) { savedSnippets.removeAll(where: { $0.id == snippet.id }); persistSnippetCache() }
+    private func sendSnippet(_ snippet: XNetTerminalSnippet) { var cmd = snippet.command; if snippet.sendReturn && !cmd.hasSuffix("\n") { cmd += "\n" }; manager.sendRaw(cmd) }
+    private func deleteLogEntry(_ entry: XNetTerminalLog) { savedSessionLogs.removeAll(where: { $0.id == entry.id }); persistSessionLogCache() }
+    private func clearSavedLogs() { savedSessionLogs = []; persistSessionLogCache() }
     
-    private func sendSnippet(_ snippet: TerminalSnippetEntry) {
-        guard manager.isConnected else { return }
-        let output = snippet.sendReturn ? snippet.command + "\n" : snippet.command
-        manager.sendRaw(output)
-    }
+    private func persistDevicesCache() { if let data = try? JSONEncoder().encode(savedDevices) { UserDefaults.standard.set(data, forKey: XNetTerminalDevice.storageKey) } }
+    private func persistGroupsCache() { if let data = try? JSONEncoder().encode(savedGroups) { UserDefaults.standard.set(data, forKey: TerminalDeviceGroupStore.storageKey) } }
+    private func persistSnippetCache() { if let data = try? JSONEncoder().encode(savedSnippets) { UserDefaults.standard.set(data, forKey: TerminalSnippetStore.storageKey) } }
+    private func persistSessionLogCache() { if let data = try? JSONEncoder().encode(savedSessionLogs) { UserDefaults.standard.set(data, forKey: TerminalSessionLogStore.storageKey) } }
     
-    private func reloadSessionLogs() {
-        guard let data = UserDefaults.standard.data(forKey: TerminalSessionLogStore.storageKey),
-              let cached = try? JSONDecoder().decode([TerminalSessionLogEntry].self, from: data) else {
-            savedSessionLogs = []
-            return
-        }
-        savedSessionLogs = cached.sorted { $0.endedAt > $1.endedAt }
-    }
+    private func toggleGroup(_ group: String) { if expandedGroups.contains(group) { expandedGroups.remove(group) } else { expandedGroups.insert(group) } }
+    private func refreshExpandedGroups() { let available = Set(groupedFilteredSavedDevices.map { $0.group }); if available.isEmpty { expandedGroups = []; return }; if expandedGroups.isEmpty { expandedGroups = available; return }; expandedGroups = expandedGroups.intersection(available); if expandedGroups.isEmpty { expandedGroups = available } }
     
-    private func persistSessionLogCache() {
-        if let data = try? JSONEncoder().encode(savedSessionLogs) {
-            UserDefaults.standard.set(data, forKey: TerminalSessionLogStore.storageKey)
-        }
-    }
+    private func normalizedCredentialID(for entry: XNetTerminalDevice) -> String { let trimmed = entry.credentialID.trimmingCharacters(in: .whitespacesAndNewlines); return trimmed.isEmpty ? "\(entry.connectionType)|\(entry.host)|\(entry.port)|\(entry.username)" : trimmed }
     
-    private func deleteLogEntry(_ entry: TerminalSessionLogEntry) {
-        savedSessionLogs.removeAll { $0.id == entry.id }
-        persistSessionLogCache()
-    }
-    
-    private func clearSavedLogs() {
-        savedSessionLogs = []
-        persistSessionLogCache()
-    }
-    
-    private func normalizedCredentialID(existing: String?) -> String {
-        let trimmed = existing?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? UUID().uuidString : trimmed
-    }
-    
-    private func normalizedGroupName(_ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Geral" : trimmed
-    }
-    
-    private func normalizedGroupCollection(_ values: [String]) -> [String] {
-        var unique: [String] = []
-        for value in values.map(normalizedGroupName(_:)) {
-            if !unique.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
-                unique.append(value)
-            }
-        }
-        return unique.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-    }
-    
-    private func ensureGroupExists(named name: String) {
-        let normalized = normalizedGroupName(name)
-        savedGroups = normalizedGroupCollection(savedGroups + [normalized])
-        persistGroupCache()
-        syncGroupsToDatabase([normalized])
-        refreshExpandedGroups()
-    }
-    
-    private func createGroup(named name: String) {
-        ensureGroupExists(named: name)
-    }
-    
-    private func prepareDeviceExport() {
-        let payload = TerminalDeviceRegistryPayload(
-            version: 1,
-            exportedAt: Date(),
-            includesPasswords: false,
-            groups: allGroupNames,
-            devices: savedDevices.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        )
-        
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        
-        do {
-            let data = try encoder.encode(payload)
-            exportDocument = TerminalDeviceRegistryDocument(text: String(decoding: data, as: UTF8.self))
-            let formatter = ISO8601DateFormatter()
-            let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-            exportFilename = "xnet-dispositivos-\(timestamp).json"
-            showingDeviceExporter = true
-        } catch {
-            importExportMessage = "Falha ao preparar exportação: \(error.localizedDescription)"
-        }
-    }
-    
-    private func handleDeviceImport(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            let hasAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if hasAccess {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-            
-            do {
-                let data = try Data(contentsOf: url)
-                try importRegistry(from: data)
-            } catch {
-                importExportMessage = "Falha ao importar: \(error.localizedDescription)"
-            }
-        case .failure(let error):
-            importExportMessage = "Falha ao importar: \(error.localizedDescription)"
-        }
-    }
-    
-    private func importRegistry(from data: Data) throws {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let payload = try decoder.decode(TerminalDeviceRegistryPayload.self, from: data)
-        
-        for group in payload.groups {
-            ensureGroupExists(named: group)
-        }
-        
-        var mergedDevices = savedDevices
-        
-        for imported in payload.devices {
-            let normalizedImported = TerminalDeviceEntry(
-                id: imported.id,
-                name: imported.name,
-                groupName: normalizedGroupName(imported.groupName),
-                connectionType: imported.connectionType,
-                host: imported.host,
-                port: imported.port,
-                username: imported.username,
-                notes: imported.notes,
-                credentialID: normalizedCredentialID(existing: imported.credentialID)
-            )
-            
-            ensureGroupExists(named: normalizedImported.groupName)
-            
-            if let existingIndex = mergedDevices.firstIndex(where: { matchesImportedEntry($0, normalizedImported) }) {
-                let existing = mergedDevices[existingIndex]
-                let merged = TerminalDeviceEntry(
-                    id: existing.id,
-                    name: normalizedImported.name,
-                    groupName: normalizedImported.groupName,
-                    connectionType: normalizedImported.connectionType,
-                    host: normalizedImported.host,
-                    port: normalizedImported.port,
-                    username: normalizedImported.username,
-                    notes: normalizedImported.notes,
-                    credentialID: existing.credentialID
-                )
-                mergedDevices[existingIndex] = merged
-                syncEntryToDatabase(merged)
-            } else {
-                mergedDevices.append(normalizedImported)
-                syncEntryToDatabase(normalizedImported)
-            }
-        }
-        
-        savedDevices = mergedDevices.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        persistSavedDevicesCache()
-        reloadSavedGroups()
-        refreshExpandedGroups()
-        NotificationCenter.default.post(name: Notification.Name("TerminalDevicesUpdated"), object: nil)
-        
-        let importedCount = payload.devices.count
-        importExportMessage = "Importação concluída. \(importedCount) dispositivo(s) processado(s). Senhas não fazem parte do arquivo por segurança."
-    }
-    
-    private func matchesImportedEntry(_ existing: TerminalDeviceEntry, _ imported: TerminalDeviceEntry) -> Bool {
-        if !existing.credentialID.isEmpty,
-           !imported.credentialID.isEmpty,
-           existing.credentialID == imported.credentialID {
-            return true
-        }
-        
-        return existing.connectionType.caseInsensitiveCompare(imported.connectionType) == .orderedSame
-        && existing.host.caseInsensitiveCompare(imported.host) == .orderedSame
-        && existing.port == imported.port
-        && existing.username.caseInsensitiveCompare(imported.username) == .orderedSame
-    }
-    
-    private func syncGroupsToDatabase(_ groupNames: [String]) {
-        let normalized = normalizedGroupCollection(groupNames + ["Geral"])
-        let descriptor = FetchDescriptor<TerminalDeviceGroup>(sortBy: [SortDescriptor(\.name, order: .forward)])
-        do {
-            let rows = try modelContext.fetch(descriptor)
-            for groupName in normalized {
-                if rows.contains(where: { $0.name.caseInsensitiveCompare(groupName) == .orderedSame }) {
-                    continue
-                }
-                modelContext.insert(TerminalDeviceGroup(name: groupName))
-            }
-            try modelContext.save()
-        } catch {
-            manager.logs += "\n[Database Group Save Error]: \(error.localizedDescription)\n"
-        }
-    }
-    
-    private func toggleGroup(_ group: String) {
-        if expandedGroups.contains(group) {
-            expandedGroups.remove(group)
-        } else {
-            expandedGroups.insert(group)
-        }
-    }
-    
-    private func refreshExpandedGroups() {
-        let available = Set(groupedFilteredSavedDevices.map(\.group))
-        if available.isEmpty {
-            expandedGroups = []
-            return
-        }
-        if expandedGroups.isEmpty {
-            expandedGroups = available
-            return
-        }
-        expandedGroups = expandedGroups.intersection(available)
-        if expandedGroups.isEmpty {
-            expandedGroups = available
-        }
-    }
-    
-    @ViewBuilder
-    private func deviceRow(_ device: TerminalDeviceEntry) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.16 : 0.24))
-                    .frame(width: 28, height: 28)
-                Image(systemName: "terminal")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(selectedTheme.accentColor)
-            }
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(device.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(selectedTheme.foregroundColor)
-                    .lineLimit(1)
-                Text("\(device.connectionType.lowercased()), \(device.username.isEmpty ? "sem user" : device.username)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(selectedTheme.mutedColor)
-                Text("\(device.host):\(device.port)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(selectedTheme.mutedColor)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                selectedDeviceID = device.id
-            }
-            
-            HStack(spacing: 4) {
-                Button {
-                    selectedDeviceID = device.id
-                    editingDevice = device
-                    showingDeviceForm = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                
-                Button {
-                    selectedDeviceID = device.id
-                    openDeviceInNewTab(device)
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.mini)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(selectedDeviceID == device.id ? selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.14 : 0.18) : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.82 : 0.32))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(selectedDeviceID == device.id ? selectedTheme.accentColor.opacity(0.55) : selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.3 : 0.45), lineWidth: 1)
-        )
-        .contextMenu {
-            Button("Editar") {
-                selectedDeviceID = device.id
-                editingDevice = device
-                showingDeviceForm = true
-            }
-            Button("Conectar") {
-                selectedDeviceID = device.id
-                openDeviceInNewTab(device)
-            }
-            Button("Excluir", role: .destructive) {
-                deleteDevice(device)
-            }
-        }
-    }
-    
-    private func normalizedCredentialID(for entry: TerminalDeviceEntry) -> String {
-        let trimmed = entry.credentialID.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "\(entry.connectionType)|\(entry.host)|\(entry.port)|\(entry.username)" : trimmed
-    }
-    
-    private func resolvePassword(for entry: TerminalDeviceEntry) -> String {
-        let primaryID = normalizedCredentialID(for: entry)
-        for candidateID in credentialCandidates(for: entry) {
-            guard let password = TerminalPasswordStore.readPassword(credentialID: candidateID),
-                  !password.isEmpty else { continue }
-            if candidateID != primaryID {
-                _ = TerminalPasswordStore.savePassword(password, credentialID: primaryID)
-            }
-            return password
+    private func resolvePassword(for entry: XNetTerminalDevice) -> String {
+        let pID = normalizedCredentialID(for: entry)
+        for cID in credentialCandidates(for: entry) {
+            guard let pass = TerminalPasswordStore.readPassword(credentialID: cID), !pass.isEmpty else { continue }
+            if cID != pID { _ = TerminalPasswordStore.savePassword(pass, credentialID: pID) }
+            return pass
         }
         return ""
     }
     
-    private func credentialCandidates(for entry: TerminalDeviceEntry) -> [String] {
-        let primaryID = normalizedCredentialID(for: entry)
-        let host = entry.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        let user = entry.username.trimmingCharacters(in: .whitespacesAndNewlines)
-        let type = entry.connectionType.trimmingCharacters(in: .whitespacesAndNewlines)
-        let port = entry.port.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hostLower = host.lowercased()
-        
-        var candidates = [
-            primaryID,
-            "\(type)|\(host)|\(port)|\(user)",
-            "\(host)|\(port)|\(user)",
-            "\(host)|\(user)"
-        ]
-        
-        if !hostLower.isEmpty {
-            candidates.append("\(type)|\(hostLower)|\(port)|\(user)")
-            candidates.append("\(hostLower)|\(port)|\(user)")
-            candidates.append("\(hostLower)|\(user)")
-        }
-        
+    private func credentialCandidates(for e: XNetTerminalDevice) -> [String] {
+        let pID = normalizedCredentialID(for: e)
+        let candidates = [pID, "\(e.connectionType)|\(e.host)|\(e.port)|\(e.username)", "\(e.host)|\(e.port)|\(e.username)", "\(e.host)|\(e.username)", "\(e.host.lowercased())|\(e.username)"]
         var unique: [String] = []
-        for candidate in candidates {
-            let value = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-            if value.isEmpty { continue }
-            if !unique.contains(value) {
-                unique.append(value)
-            }
-        }
+        for c in candidates { let v = c.trimmingCharacters(in: .whitespacesAndNewlines); if !v.isEmpty && !unique.contains(v) { unique.append(v) } }
         return unique
-    }
-}
-
-private struct TerminalDevicePayload {
-    var name: String
-    var groupName: String
-    var connectionType: String
-    var host: String
-    var port: String
-    var username: String
-    var password: String
-    var notes: String
-}
-
-private struct TerminalSnippetPayload {
-    var title: String
-    var command: String
-    var notes: String
-    var sendReturn: Bool
-}
-
-private struct TerminalDeviceEntry: Identifiable, Codable, Equatable {
-    let id: UUID
-    var name: String
-    var groupName: String
-    var connectionType: String
-    var host: String
-    var port: String
-    var username: String
-    var notes: String
-    var credentialID: String
-    
-    static let storageKey = "terminal.device.cache.v3"
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case groupName
-        case connectionType
-        case host
-        case port
-        case username
-        case notes
-        case credentialID
-    }
-    
-    init(id: UUID, name: String, groupName: String, connectionType: String, host: String, port: String, username: String, notes: String, credentialID: String) {
-        self.id = id
-        self.name = name
-        self.groupName = groupName
-        self.connectionType = connectionType
-        self.host = host
-        self.port = port
-        self.username = username
-        self.notes = notes
-        self.credentialID = credentialID
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
-        groupName = try container.decodeIfPresent(String.self, forKey: .groupName) ?? "Geral"
-        connectionType = try container.decode(String.self, forKey: .connectionType)
-        host = try container.decode(String.self, forKey: .host)
-        port = try container.decode(String.self, forKey: .port)
-        username = try container.decode(String.self, forKey: .username)
-        notes = try container.decode(String.self, forKey: .notes)
-        credentialID = try container.decode(String.self, forKey: .credentialID)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(groupName, forKey: .groupName)
-        try container.encode(connectionType, forKey: .connectionType)
-        try container.encode(host, forKey: .host)
-        try container.encode(port, forKey: .port)
-        try container.encode(username, forKey: .username)
-        try container.encode(notes, forKey: .notes)
-        try container.encode(credentialID, forKey: .credentialID)
-    }
-}
-
-private struct TerminalTabItem: Identifiable {
-    let id = UUID()
-    var name: String
-    var connectionType: TerminalView.ConnectionType = .ssh
-    var host: String = ""
-    var port: String = "22"
-    var username: String = ""
-    var password: String = ""
-    var availableSerialPorts: [String] = []
-    var manager: TerminalConnectionManager = TerminalConnectionManager()
-    var sessionStartedAt: Date?
-    var persistedLogSignature: String?
-    
-    var displayName: String {
-        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedHost.isEmpty ? name : trimmedHost
-    }
-}
-
-private struct TerminalSnippetEntry: Identifiable, Codable, Equatable {
-    let id: UUID
-    var title: String
-    var command: String
-    var notes: String
-    var sendReturn: Bool
-}
-
-private struct TerminalSessionLogEntry: Identifiable, Codable, Equatable {
-    let id: UUID
-    var title: String
-    var connectionType: String
-    var host: String
-    var port: String
-    var username: String
-    var startedAt: Date
-    var endedAt: Date
-    var content: String
-    
-    var subtitle: String {
-        let identity = username.isEmpty ? host : "\(username)@\(host)"
-        return "\(connectionType) • \(identity):\(port)"
-    }
-}
-
-private struct TerminalSnippetLibrarySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let snippets: [TerminalSnippetEntry]
-    @Binding var searchText: String
-    let canSend: Bool
-    let onAdd: () -> Void
-    let onEdit: (TerminalSnippetEntry) -> Void
-    let onDelete: (TerminalSnippetEntry) -> Void
-    let onSend: (TerminalSnippetEntry) -> Void
-    let onSave: (TerminalSnippetPayload) -> Void
-    let editingSnippet: TerminalSnippetEntry?
-    
-    @State private var showingForm = false
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Biblioteca de Snippets")
-                        .font(.title3.bold())
-                        .foregroundStyle(selectedTheme.foregroundColor)
-                    Text("Comandos persistentes para reuso rápido")
-                        .font(.caption)
-                        .foregroundStyle(selectedTheme.mutedColor)
-                }
-                Spacer()
-                Button {
-                    onAdd()
-                    showingForm = true
-                } label: {
-                    Label("Novo Snippet", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(selectedTheme.accentColor)
-                .keyboardShortcut(.defaultAction)
-                
-                Button("Fechar") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-            }
-            
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(selectedTheme.mutedColor)
-                TextField("Buscar snippet", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(selectedTheme.foregroundColor)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.6))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1))
-            
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(snippets) { snippet in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(alignment: .top, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(snippet.title)
-                                        .font(.headline)
-                                        .foregroundStyle(selectedTheme.foregroundColor)
-                                    if !snippet.notes.isEmpty {
-                                        Text(snippet.notes)
-                                            .font(.caption)
-                                            .foregroundStyle(selectedTheme.mutedColor)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                if snippet.sendReturn {
-                                    Text("ENTER")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(selectedTheme.accentColor.opacity(0.12))
-                                        .foregroundStyle(selectedTheme.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                Text(snippet.command)
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundStyle(selectedTheme.foregroundColor)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(12)
-                            }
-                            .background(selectedTheme.backgroundColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
-                            
-                            HStack {
-                                Button {
-                                    onEdit(snippet)
-                                    showingForm = true
-                                } label: {
-                                    Label("Editar", systemImage: "square.and.pencil")
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                
-                                Button(role: .destructive) {
-                                    onDelete(snippet)
-                                } label: {
-                                    Label("Excluir", systemImage: "trash")
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    onSend(snippet)
-                                } label: {
-                                    Label("Executar", systemImage: "paperplane.fill")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(selectedTheme.accentColor)
-                                .controlSize(.small)
-                                .disabled(!canSend)
-                            }
-                        }
-                        .padding(14)
-                        .background(selectedTheme.cardBackgroundColor.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selectedTheme.panelBorderColor.opacity(0.25), lineWidth: 1))
-                    }
-                    
-                    if snippets.isEmpty {
-                        VStack(spacing: 14) {
-                            Image(systemName: "terminal.textbox")
-                                .font(.system(size: 40))
-                                .foregroundStyle(selectedTheme.mutedColor.opacity(0.5))
-                            Text("Nenhum snippet cadastrado")
-                                .font(.headline)
-                                .foregroundStyle(selectedTheme.foregroundColor)
-                            Text("Crie comandos prontos para executar no terminal sem redigitar.")
-                                .font(.subheadline)
-                                .foregroundStyle(selectedTheme.mutedColor)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 48)
-                    }
-                }
-            }
-        }
-        .padding(24)
-        .frame(width: 760, height: 560)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .sheet(isPresented: $showingForm) {
-            TerminalSnippetFormSheet(snippetToEdit: editingSnippet, onSave: onSave)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            }
-        }
-    }
-}
-
-private struct TerminalSnippetFormSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let snippetToEdit: TerminalSnippetEntry?
-    let onSave: (TerminalSnippetPayload) -> Void
-    
-    @State private var title = ""
-    @State private var command = ""
-    @State private var notes = ""
-    @State private var sendReturn = true
-    
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text(snippetToEdit == nil ? "Novo Snippet" : "Editar Snippet")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(selectedTheme.foregroundColor)
-            
-            Form {
-                Section {
-                    TextField("Nome do comando", text: $title)
-                    Toggle("Transmitir ENTER (CRLF)", isOn: $sendReturn)
-                } header: {
-                    Text("IDENTIDADE").font(.caption2).bold()
-                }
-                
-                Section {
-                    TextEditor(text: $command)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 140)
-                        .padding(8)
-                        .background(selectedTheme.backgroundColor.opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
-                } header: {
-                    Text("CÓDIGO FONTE / COMANDO").font(.caption2).bold()
-                }
-
-                Section {
-                    TextField("Descrição curta", text: $notes)
-                } header: {
-                    Text("NOTAS").font(.caption2).bold()
-                }
-            }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-            
-            HStack(spacing: 16) {
-                Button("Cancelar") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                
-                Spacer()
-                
-                Button("Gravar Snippet") {
-                    onSave(
-                        TerminalSnippetPayload(
-                            title: title,
-                            command: command,
-                            notes: notes,
-                            sendReturn: sendReturn
-                        )
-                    )
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(selectedTheme.accentColor)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 8)
-        }
-        .padding(.vertical, 24)
-        .frame(width: 520, height: 580)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .onAppear {
-            guard let snippetToEdit else { return }
-            title = snippetToEdit.title
-            command = snippetToEdit.command
-            notes = snippetToEdit.notes
-            sendReturn = snippetToEdit.sendReturn
-        }
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            }
-        }
-    }
-}
-
-private struct TerminalLogHistorySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let logs: [TerminalSessionLogEntry]
-    @Binding var searchText: String
-    let onDelete: (TerminalSessionLogEntry) -> Void
-    let onClear: () -> Void
-    
-    private let formatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        return formatter
-    }()
-    
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Histórico de Sessões")
-                        .font(.title3.bold())
-                        .foregroundStyle(selectedTheme.foregroundColor)
-                    Text("Logs persistentes de atividades anteriores")
-                        .font(.caption)
-                        .foregroundStyle(selectedTheme.mutedColor)
-                }
-                Spacer()
-                if !logs.isEmpty {
-                    Button("Limpar Tudo", role: .destructive) {
-                        onClear()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                Button("Fechar") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-                .tint(selectedTheme.accentColor)
-            }
-            
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(selectedTheme.mutedColor)
-                TextField("Buscar por host, usuário ou conteúdo", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(selectedTheme.foregroundColor)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.6))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.3), lineWidth: 1))
-            
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(logs) { entry in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(entry.title)
-                                        .font(.headline)
-                                        .foregroundStyle(selectedTheme.foregroundColor)
-                                    Text(entry.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(selectedTheme.mutedColor)
-                                    Text("Início: \(formatter.string(from: entry.startedAt)) • Fim: \(formatter.string(from: entry.endedAt))")
-                                        .font(.caption2)
-                                        .foregroundStyle(selectedTheme.mutedColor.opacity(0.8))
-                                }
-                                Spacer()
-                                Button(role: .destructive) {
-                                    onDelete(entry)
-                                } label: {
-                                    Image(systemName: "trash")
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                Text(entry.content)
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundStyle(selectedTheme.foregroundColor)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(12)
-                            }
-                            .background(selectedTheme.backgroundColor.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
-                        }
-                        .padding(14)
-                        .background(selectedTheme.cardBackgroundColor.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
-                    }
-                    
-                    if logs.isEmpty {
-                        VStack(spacing: 14) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 40))
-                                .foregroundStyle(selectedTheme.mutedColor.opacity(0.5))
-                            Text("Nenhum log disponível")
-                                .font(.headline)
-                                .foregroundStyle(selectedTheme.foregroundColor)
-                            Text("As sessões encerradas aparecem aqui automaticamente.")
-                                .font(.subheadline)
-                                .foregroundStyle(selectedTheme.mutedColor)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 48)
-                    }
-                }
-            }
-        }
-        .padding(24)
-        .frame(width: 860, height: 620)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            }
-        }
-    }
-}
-
-private struct TerminalDeviceFormSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let deviceToEdit: TerminalDeviceEntry?
-    let availableGroups: [String]
-    let onSave: (TerminalDevicePayload) -> Void
-    
-    @State private var name = ""
-    @State private var connectionType: TerminalView.ConnectionType = .ssh
-    @State private var groupName = "Geral"
-    @State private var host = ""
-    @State private var port = "22"
-    @State private var username = ""
-    @State private var password = ""
-    @State private var notes = ""
-    
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text(deviceToEdit == nil ? "Novo Dispositivo" : "Editar Dispositivo")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(selectedTheme.foregroundColor)
-            
-            Form {
-                Section {
-                    TextField("Nome", text: $name)
-                    Picker("Grupo/Pasta", selection: $groupName) {
-                        ForEach(availableGroups, id: \.self) { group in
-                            Text(group).tag(group)
-                        }
-                    }
-                } header: {
-                    Text("IDENTIFICAÇÃO").font(.caption2).bold()
-                }
-                
-                Section {
-                    Picker("Tipo de Conexão", selection: $connectionType) {
-                        ForEach(TerminalView.ConnectionType.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    TextField(connectionType == .serial ? "Porta serial" : "Host/IP", text: $host)
-                    TextField(connectionType == .serial ? "Baud rate" : "Porta", text: $port)
-                } header: {
-                    Text("CONECTIVIDADE").font(.caption2).bold()
-                }
-
-                if connectionType == .ssh || connectionType != .serial {
-                    Section {
-                        if connectionType == .ssh {
-                            TextField("Usuário", text: $username)
-                        }
-                        SecureField("Senha", text: $password)
-                    } header: {
-                        Text("AUTENTICAÇÃO").font(.caption2).bold()
-                    }
-                }
-
-                Section {
-                    TextField("Notas/Observações", text: $notes)
-                } header: {
-                    Text("DIVERSOS").font(.caption2).bold()
-                }
-            }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-            
-            HStack(spacing: 16) {
-                Button("Cancelar") {
-                    dismiss()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                
-                Spacer()
-                
-                Button("Salvar") {
-                    onSave(
-                        TerminalDevicePayload(
-                            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Dispositivo" : name,
-                            groupName: groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Geral" : groupName,
-                            connectionType: connectionType.rawValue,
-                            host: host,
-                            port: port,
-                            username: username,
-                            password: password,
-                            notes: notes
-                        )
-                    )
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(selectedTheme.accentColor)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && connectionType != .serial)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 8)
-        }
-        .padding(.vertical, 24)
-        .frame(width: 480, height: 620)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .onAppear {
-            if let firstGroup = availableGroups.first {
-                if groupName == "Geral" { groupName = firstGroup }
-            }
-            guard let device = deviceToEdit else { return }
-            name = device.name
-            connectionType = TerminalView.ConnectionType(rawValue: device.connectionType) ?? .ssh
-            groupName = device.groupName
-            host = device.host
-            port = device.port
-            username = device.username
-            password = TerminalPasswordStore.readPassword(credentialID: device.credentialID) ?? ""
-            notes = device.notes
-        }
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            }
-        }
-        .onChange(of: connectionType) { _, value in
-            if deviceToEdit != nil { return }
-            switch value {
-            case .ssh:
-                port = "22"
-            case .telnet:
-                port = "23"
-            case .serial:
-                port = "115200"
-            }
-        }
-    }
-}
-
-private struct TerminalDeviceGroupFormSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    
-    let onSave: (String) -> Void
-    
-    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
-    private var selectedTheme: TerminalTheme {
-        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
-    }
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Nova Pasta de Rede")
-                .font(.headline)
-                .foregroundStyle(selectedTheme.foregroundColor)
-            
-            Form {
-                TextField("Nome da pasta", text: $name)
-            }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-            
-            HStack {
-                Button("Cancelar") { dismiss() }
-                Spacer()
-                Button("Criar") {
-                    onSave(name)
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(selectedTheme.accentColor)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(24)
-        .frame(width: 320)
-        .background(selectedTheme.backgroundColor)
-        .cornerRadius(16)
-        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
-            if let themeID = output.object as? String {
-                selectedThemeID = themeID
-            }
-        }
-    }
-}
-
-#Preview {
-    TerminalView()
-}
-
-private enum TerminalPasswordStore {
-    private static let keyPrefix = "br.com.myrouter.xnet.terminal.password."
-    
-    static func savePassword(_ password: String, credentialID: String) -> Bool {
-        UserDefaults.standard.set(password, forKey: keyPrefix + credentialID)
-        return true
-    }
-    
-    static func readPassword(credentialID: String) -> String? {
-        UserDefaults.standard.string(forKey: keyPrefix + credentialID)
-    }
-    
-    static func deletePassword(credentialID: String) {
-        UserDefaults.standard.removeObject(forKey: keyPrefix + credentialID)
-    }
-}
-
-private enum TerminalDeviceGroupStore {
-    static let storageKey = "terminal.group.cache.v1"
-}
-
-enum TerminalThemeStore {
-    static let storageKey = "terminal.theme.selected.v1"
-    static let didChangeNotification = Notification.Name("TerminalThemeChanged")
-    
-    static func readThemeID() -> String {
-        UserDefaults.standard.string(forKey: storageKey) ?? TerminalTheme.defaultTheme.rawValue
-    }
-    
-    static func saveThemeID(_ themeID: String) {
-        UserDefaults.standard.set(themeID, forKey: storageKey)
-        NotificationCenter.default.post(name: didChangeNotification, object: themeID)
-    }
-}
-
-private enum TerminalSnippetStore {
-    static let storageKey = "terminal.snippet.cache.v1"
-}
-
-private enum TerminalSessionLogStore {
-    static let storageKey = "terminal.session.log.cache.v1"
-}
-
-private struct TerminalDeviceRegistryPayload: Codable {
-    let version: Int
-    let exportedAt: Date
-    let includesPasswords: Bool
-    let groups: [String]
-    let devices: [TerminalDeviceEntry]
-}
-
-private struct TerminalDeviceRegistryDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    
-    var text: String
-    
-    init(text: String = "") {
-        self.text = text
-    }
-    
-    init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.regularFileContents,
-              let text = String(data: data, encoding: .utf8) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        self.text = text
-    }
-    
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }
