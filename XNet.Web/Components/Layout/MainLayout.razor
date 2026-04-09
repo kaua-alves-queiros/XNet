@@ -1,25 +1,11 @@
 @inherits LayoutComponentBase
 
 <div class="app-viewport" id="overview">
-    <main role="main" class="container-apple">
-        @Body
-    </main>
+    @Body
 </div>
 
-<div id="blazor-error-ui" data-nosnippet>
+<div id="blazor-error-ui">
     An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <a href="" class="reload">Reload</a>
+    <a href="" class="dismiss">🗙</a>
 </div>
-
-<style>
-    .app-viewport {
-        min-height: 100vh;
-        width: 100%;
-        background-color: var(--apple-bg);
-    }
-    .container-apple {
-        max-width: 1024px;
-        margin: 0 auto;
-    }
-</style>
