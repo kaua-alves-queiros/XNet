@@ -13,17 +13,22 @@ struct NetBoxView: View {
     @Query(sort: \NetBoxDevice.name) private var allDevices: [NetBoxDevice]
     @Query(sort: \NetBoxPrefix.cidr) private var allPrefixes: [NetBoxPrefix]
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 // Dashboard Header
-                HeaderView(title: "NetBox Audit", subtitle: "Infrastructure and IPAM Management")
+                HeaderView(title: "NetBox Audit", subtitle: "Infrastructure and IPAM Management", theme: selectedTheme)
                 
                 // Asset Overview Grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))], spacing: 20) {
-                    AssetCard(title: "Deployment Sites", count: allSites.count, icon: "building.2.fill", color: .purple)
-                    AssetCard(title: "Total Devices", count: allDevices.count, icon: "cpu.fill", color: .blue)
-                    AssetCard(title: "IP Prefixes", count: allPrefixes.count, icon: "network", color: .green)
+                    AssetCard(title: "Deployment Sites", count: allSites.count, icon: "building.2.fill", color: .purple, theme: selectedTheme)
+                    AssetCard(title: "Total Devices", count: allDevices.count, icon: "cpu.fill", color: .blue, theme: selectedTheme)
+                    AssetCard(title: "IP Prefixes", count: allPrefixes.count, icon: "network", color: .green, theme: selectedTheme)
                 }
                 
                 // Detailed Breakdown Section
@@ -31,31 +36,48 @@ struct NetBoxView: View {
                     Text("Infrastructure Health")
                         .font(.title3)
                         .bold()
+                        .foregroundStyle(selectedTheme.foregroundColor)
                     
                     HStack(spacing: 20) {
-                        QuickMetric(title: "Active VLANs", value: "14", trend: "+2 this week")
-                        QuickMetric(title: "Usage (L3)", value: "62%", trend: "Stable")
-                        QuickMetric(title: "Rack Units", value: "24U Used", trend: "4U Free")
+                        QuickMetric(title: "Active VLANs", value: "14", trend: "+2 this week", theme: selectedTheme)
+                        QuickMetric(title: "Usage (L3)", value: "62%", trend: "Stable", theme: selectedTheme)
+                        QuickMetric(title: "Rack Units", value: "24U Used", trend: "4U Free", theme: selectedTheme)
                     }
                 }
             }
             .padding(32)
         }
-        .background(Color(NSColor.windowBackgroundColor))
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
     }
 }
 
 struct HeaderView: View {
     let title: String
     let subtitle: String
+    let theme: TerminalTheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 34, weight: .bold))
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(theme.foregroundColor)
             Text(subtitle)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.mutedColor)
         }
     }
 }
@@ -65,6 +87,7 @@ struct AssetCard: View {
     let count: Int
     let icon: String
     let color: Color
+    let theme: TerminalTheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -74,23 +97,24 @@ struct AssetCard: View {
                     .foregroundStyle(color)
                 Spacer()
                 Image(systemName: "arrow.up.right.circle.fill")
-                    .foregroundStyle(.secondary.opacity(0.3))
+                    .foregroundStyle(theme.mutedColor.opacity(0.3))
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(count)")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(theme.foregroundColor)
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.mutedColor)
             }
         }
         .padding(24)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.94 : 0.6))
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                .stroke(theme.panelBorderColor.opacity(0.35), lineWidth: 1)
         )
     }
 }
@@ -99,24 +123,30 @@ struct QuickMetric: View {
     let title: String
     let value: String
     let trend: String
+    let theme: TerminalTheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption2)
                 .bold()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.mutedColor)
                 .kerning(1)
             Text(value)
                 .font(.title2)
                 .bold()
+                .foregroundStyle(theme.foregroundColor)
             Text(trend)
                 .font(.caption)
                 .foregroundStyle(.green)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(theme.cardBackgroundColor.opacity(theme.isLight ? 0.94 : 0.6))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(theme.panelBorderColor.opacity(0.35), lineWidth: 1)
+        )
     }
 }
