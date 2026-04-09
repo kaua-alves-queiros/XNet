@@ -49,4 +49,18 @@ fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
 
+# .NET Build artifacts
+[Bb]in/
+[Oo]bj/
+wwwroot/lib/
+*.exe
+*.dll
+*.pdb
+*.suo
+*.user
+*.userosscache
+*.sln.docuser
+publish/
+.vs/
+
 # End of file
