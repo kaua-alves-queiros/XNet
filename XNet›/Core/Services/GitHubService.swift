@@ -49,12 +49,16 @@ class GitHubService: ObservableObject {
     }
     
     func fetchContributors() async {
-        // Parallel check: if we have valid cache, don't block
-        if let lastFetch = UserDefaults.standard.object(forKey: lastFetchKey) as? Date,
-           Date().timeIntervalSince(lastFetch) < cacheDuration,
-           !contributors.isEmpty {
+        let lastFetch = UserDefaults.standard.object(forKey: lastFetchKey) as? Date
+        let isCacheExpired = lastFetch == nil || Date().timeIntervalSince(lastFetch!) > cacheDuration
+        
+        // If cache is still valid and we have data, do nothing
+        if !isCacheExpired && !contributors.isEmpty {
+            print("GitHub Team: Using valid cache (expires in \(Int((cacheDuration - Date().timeIntervalSince(lastFetch!)) / 3600)) hours)")
             return
         }
+        
+        if isFetching { return }
         
         guard let url = URL(string: "https://api.github.com/repos/\(repoOwner)/\(repoName)/contributors") else { return }
         
@@ -91,6 +95,7 @@ class GitHubService: ObservableObject {
         return try JSONDecoder().decode(GitHubUserDetails.self, from: data)
     }
     
+    @MainActor
     private func loadFromCache() {
         guard let data = UserDefaults.standard.data(forKey: cacheKey),
               let cached = try? JSONDecoder().decode([GitHubUserDetails].self, from: data) else { return }

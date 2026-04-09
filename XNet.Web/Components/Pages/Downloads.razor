@@ -1,0 +1,156 @@
+@page "/downloads"
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+
+<PageTitle>Downloads - XNet› Professional</PageTitle>
+
+<!-- Unified Apple Nav -->
+<header class="apple-nav">
+    <div class="nav-container">
+        <a href="/#overview" class="nav-logo">
+            <img src="assets/logo.png" width="32" height="32" alt="logo" />
+            XNet›
+        </a>
+        <div class="nav-links">
+            <a href="/#capabilities">Capabilities</a>
+            <a href="/documentation">Documentation</a>
+            <a href="/documentation/github">GitHub</a>
+        </div>
+    </div>
+</header>
+
+<main class="container py-5 mt-5">
+    <div class="text-center mb-5 animate-fade">
+        <h1 class="display-3 fw-bold text-white mb-3">Downloads</h1>
+        <p class="hero-description mx-auto">Get the latest version of XNet Professional for macOS. Always open source and updated via GitHub.</p>
+    </div>
+
+    @if (releases == null)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Checking for latest releases...</p>
+        </div>
+    }
+    else if (!releases.Any())
+    {
+        <div class="glass-card text-center p-5">
+            <i class="bi bi-exclamation-circle h1 d-block mb-4"></i>
+            <h3 class="text-white">No releases found.</h3>
+            <p class="text-muted">Stay tuned for the first official release of XNet.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 justify-content-center">
+            @foreach (var release in releases)
+            {
+                <div class="col-lg-8">
+                    <div class="glass-card mb-4 animate-fade">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h2 class="h3 fw-bold text-white mb-1">@release.Name</h2>
+                                <span class="badge @(release.Prerelease ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success") rounded-pill">
+                                    @(release.Prerelease ? "Beta" : "Stable")
+                                </span>
+                                <small class="text-muted ms-2">Released on @release.PublishedAt.ToString("MMM dd, yyyy")</small>
+                            </div>
+                            <div class="text-end">
+                                <a href="@release.HtmlUrl" target="_blank" class="apple-btn-blue">View on GitHub</a>
+                            </div>
+                        </div>
+
+                        <div class="release-body mb-4">
+                             @release.Body
+                        </div>
+
+                        <h4 class="h6 fw-bold mb-3">Assets</h4>
+                        <div class="list-group list-group-flush border-0">
+                            @foreach (var asset in release.Assets)
+                            {
+                                <a href="@asset.DownloadUrl" class="list-group-item bg-transparent text-decoration-none border-0 px-0 d-flex justify-content-between align-items-center mb-2" style="border-radius: 12px; transition: background 0.2s;">
+                                    <span>
+                                        <i class="bi @(asset.Name.EndsWith(".dmg") ? "bi-box-arrow-down" : "bi-file-earmark-zip") me-2 text-primary"></i>
+                                        @asset.Name
+                                    </span>
+                                    <span class="text-muted small">@((asset.Size / 1024.0 / 1024.0).ToString("N1")) MB</span>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</main>
+
+<style>
+    .release-body {
+        white-space: pre-wrap;
+        color: var(--apple-text-secondary) !important;
+        line-height: 1.6;
+    }
+    .list-group-item {
+        color: var(--apple-text) !important;
+    }
+    .list-group-item:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        color: var(--apple-accent) !important;
+    }
+</style>
+
+@code {
+    private List<GitHubRelease>? releases;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/kaua-alves-queiros/XNet/releases");
+            request.Headers.Add("User-Agent", "XNet-Web-Portal");
+
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                releases = JsonSerializer.Deserialize<List<GitHubRelease>>(json, new JsonSerializerOptions 
+                { 
+                    PropertyNameCaseInsensitive = true 
+                });
+            }
+            else
+            {
+                releases = new List<GitHubRelease>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching releases: {ex.Message}");
+            releases = new List<GitHubRelease>();
+        }
+    }
+
+    public class GitHubRelease
+    {
+        [JsonPropertyName("id")] public long Id { get; set; }
+        [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("tag_name")] public string TagName { get; set; } = string.Empty;
+        [JsonPropertyName("html_url")] public string HtmlUrl { get; set; } = string.Empty;
+        [JsonPropertyName("body")] public string Body { get; set; } = string.Empty;
+        [JsonPropertyName("prerelease")] public bool Prerelease { get; set; }
+        [JsonPropertyName("published_at")] public DateTime PublishedAt { get; set; }
+        [JsonPropertyName("assets")] public List<GitHubAsset> Assets { get; set; } = new();
+    }
+
+    public class GitHubAsset
+    {
+        [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("size")] public long Size { get; set; }
+        [JsonPropertyName("browser_download_url")] public string DownloadUrl { get; set; } = string.Empty;
+    }
+}
