@@ -12,6 +12,7 @@ struct SiteDetailView: View {
     @State private var editSession: EditSession? = nil
     @State private var ename = ""
     @State private var edesc = ""
+    @State private var showingDeleteConfirmation = false
     
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     private var selectedTheme: TerminalTheme {
@@ -23,7 +24,15 @@ struct SiteDetailView: View {
             .navigationTitle(site.name)
             .navigationSubtitle(subtitle)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Site", systemImage: "trash")
+                            .foregroundStyle(.red)
+                    }
+                    .keyboardShortcut(.delete, modifiers: [.command])
+                    
                     Button {
                         beginEditing()
                     } label: {
@@ -56,6 +65,14 @@ struct SiteDetailView: View {
                 } else {
                     selectedThemeID = TerminalThemeStore.readThemeID()
                 }
+            }
+            .alert("Delete Site?", isPresented: $showingDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(site)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to permanently delete \(site.name)?")
             }
     }
 

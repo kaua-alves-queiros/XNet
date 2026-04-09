@@ -8,6 +8,7 @@ struct PrefixDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingAssign = false
     @State private var showingEdit = false
+    @State private var showingDeleteConfirmation = false
     @State private var showingDeviceSearch = false
     @State private var deviceSearchText = ""
     
@@ -35,7 +36,6 @@ struct PrefixDetailView: View {
                     }
                     Spacer()
                     HStack {
-                         Button("Edit Prefix") { editCidr = prefix.cidr; editDesc = prefix.prefixDescription; showingEdit = true }.buttonStyle(.plain).foregroundStyle(selectedTheme.accentColor)
                          Button { prepareAssignment(); showingAssign = true } label: { Label("Assign IP", systemImage: "plus.circle.fill") }.buttonStyle(.borderedProminent).tint(selectedTheme.accentColor)
                     }
                 }
@@ -86,6 +86,26 @@ struct PrefixDetailView: View {
                 endPoint: .bottom
             )
         )
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete Prefix", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+                .keyboardShortcut(.delete, modifiers: [.command])
+                
+                Button {
+                    editCidr = prefix.cidr
+                    editDesc = prefix.prefixDescription
+                    showingEdit = true
+                } label: {
+                    Label("Edit Subnet", systemImage: "pencil")
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
             if let themeID = output.object as? String {
                 selectedThemeID = themeID
@@ -115,6 +135,14 @@ struct PrefixDetailView: View {
                 }
                 HStack { Button("Cancel") { showingAssign = false }; Spacer(); Button("Assign") { saveAssignment() }.buttonStyle(.borderedProminent).tint(selectedTheme.accentColor).disabled(newIP.isEmpty) }
             }.padding().frame(width: 350).background(selectedTheme.backgroundColor).cornerRadius(12)
+        }
+        .alert("Release Prefix?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete and Unassign IPs", role: .destructive) {
+                modelContext.delete(prefix)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to permanently delete \(prefix.cidr)? All IP allocations within this subnet will be released.")
         }
     }
     

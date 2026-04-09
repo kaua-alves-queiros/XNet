@@ -46,17 +46,6 @@ struct VLANGroupDetailView: View {
                     .bold()
             }
             
-            Section {
-                Button("Modify Range Constraints") { 
-                    ename = group.name; emin = "\(group.minVID)"; emax = "\(group.maxVID)"; isEditing = true 
-                }.foregroundStyle(selectedTheme.accentColor)
-                Button("Delete Group", role: .destructive) { showingDeleteConfirmation = true }.foregroundStyle(.red)
-            } header: {
-                Text("Range Actions")
-                    .foregroundStyle(selectedTheme.mutedColor)
-                    .font(.caption)
-                    .bold()
-            }
         }
         .scrollContentBackground(.hidden)
         .alternatingRowBackgrounds(.disabled)
@@ -68,10 +57,30 @@ struct VLANGroupDetailView: View {
             )
         )
         .navigationTitle(group.name)
-        .confirmationDialog("Delete Group?", isPresented: $showingDeleteConfirmation) {
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete Group", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+                .keyboardShortcut(.delete, modifiers: [.command])
+                
+                Button {
+                    ename = group.name
+                    emin = "\(group.minVID)"
+                    emax = "\(group.maxVID)"
+                    isEditing = true
+                } label: {
+                    Label("Edit Range", systemImage: "pencil")
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+            }
+        }
+        .alert("Delete Group?", isPresented: $showingDeleteConfirmation) {
             Button("Delete Group \(group.name)", role: .destructive) {
                 modelContext.delete(group)
-                try? modelContext.save()
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }

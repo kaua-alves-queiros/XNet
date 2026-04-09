@@ -5,6 +5,7 @@ struct DeviceDetailView: View {
     let device: NetBoxDevice
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false; @State private var editName = ""
+    @State private var showingDeleteConfirmation = false
     
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     private var selectedTheme: TerminalTheme {
@@ -59,17 +60,6 @@ struct DeviceDetailView: View {
                 }
             }
             
-            Section {
-                Button("Edit Hostname") { editName = device.name; isEditing = true }
-                    .foregroundStyle(selectedTheme.accentColor)
-                Button(role: .destructive) { modelContext.delete(device); try? modelContext.save() } label: { Label("Decommission Device", systemImage: "trash") }
-                    .foregroundStyle(.red)
-            } header: {
-                Text("Audit Actions")
-                    .foregroundStyle(selectedTheme.mutedColor)
-                    .font(.caption)
-                    .bold()
-            }
         }
         .scrollContentBackground(.hidden)
         .alternatingRowBackgrounds(.disabled)
@@ -81,6 +71,25 @@ struct DeviceDetailView: View {
             )
         )
         .navigationTitle(device.name)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Decommission Device", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+                .keyboardShortcut(.delete, modifiers: [.command])
+                
+                Button {
+                    editName = device.name
+                    isEditing = true
+                } label: {
+                    Label("Edit Device", systemImage: "pencil")
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+            }
+        }
         .sheet(isPresented: $isEditing) {
              VStack(spacing: 20) {
                   Text("Update Machine Asset").font(.headline)
@@ -112,6 +121,14 @@ struct DeviceDetailView: View {
             } else {
                 selectedThemeID = TerminalThemeStore.readThemeID()
             }
+        }
+        .alert("Decommission Device?", isPresented: $showingDeleteConfirmation) {
+            Button("Decommission", role: .destructive) {
+                modelContext.delete(device)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to permanently delete \(device.name)?")
         }
     }
 }

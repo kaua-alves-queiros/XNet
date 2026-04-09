@@ -60,17 +60,6 @@ struct VLANDetailView: View {
                  }
             }
             
-            Section {
-                Button("Edit Details") { ename = vlan.name; edesc = vlan.vlanDescription; isEditing = true }
-                    .foregroundStyle(selectedTheme.accentColor)
-                Button("Delete VLAN", role: .destructive) { showingDeleteConfirmation = true }
-                    .foregroundStyle(.red)
-            } header: {
-                Text("Actions")
-                    .foregroundStyle(selectedTheme.mutedColor)
-                    .font(.caption)
-                    .bold()
-            }
         }
         .scrollContentBackground(.hidden)
         .alternatingRowBackgrounds(.disabled)
@@ -82,10 +71,29 @@ struct VLANDetailView: View {
             )
         )
         .navigationTitle("VLAN \(vlan.vid)")
-        .confirmationDialog("Delete VLAN?", isPresented: $showingDeleteConfirmation) {
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete VLAN", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+                .keyboardShortcut(.delete, modifiers: [.command])
+                
+                Button {
+                    ename = vlan.name
+                    edesc = vlan.vlanDescription
+                    isEditing = true
+                } label: {
+                    Label("Edit VLAN", systemImage: "pencil")
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+            }
+        }
+        .alert("Delete VLAN?", isPresented: $showingDeleteConfirmation) {
             Button("Delete VLAN \(vlan.vid)", role: .destructive) {
                 modelContext.delete(vlan)
-                try? modelContext.save()
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }
