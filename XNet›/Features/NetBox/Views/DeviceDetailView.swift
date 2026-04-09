@@ -72,6 +72,7 @@ struct DeviceDetailView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .alternatingRowBackgrounds(.disabled)
         .background(
             LinearGradient(
                 colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],

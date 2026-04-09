@@ -149,6 +149,7 @@ struct PingView: View {
             }
             .tableStyle(.inset)
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .background(
             LinearGradient(

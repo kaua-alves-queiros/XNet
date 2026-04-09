@@ -122,6 +122,7 @@ struct TracerouteView: View {
             }
             .tableStyle(.inset)
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .background(
             LinearGradient(

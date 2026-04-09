@@ -77,6 +77,7 @@ struct PrefixDetailView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .background(
             LinearGradient(
@@ -150,6 +151,7 @@ struct DeviceSelector: View {
                 Button { onSelect(dev) } label: { HStack { Image(systemName: "cpu").foregroundStyle(theme.accentColor); Text(dev.name).bold().foregroundStyle(theme.foregroundColor) } }.buttonStyle(.plain)
             }
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
             .background(theme.backgroundColor)
         }
     }

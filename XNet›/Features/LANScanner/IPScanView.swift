@@ -144,6 +144,7 @@ struct IPScanView: View {
             }
             .tableStyle(.inset)
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .background(
             LinearGradient(

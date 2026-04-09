@@ -29,7 +29,7 @@ struct NetBoxSitesDashboard: View {
                 try? modelContext.save()
             }
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .listStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
             if let themeID = output.object as? String {
@@ -73,7 +73,7 @@ struct NetBoxAllDevicesView: View {
                 try? modelContext.save()
             }
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .listStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
             if let themeID = output.object as? String {
@@ -118,7 +118,7 @@ struct NetBoxIPAMDashboard: View {
                 try? modelContext.save()
             }
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .listStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
             if let themeID = output.object as? String {
@@ -159,7 +159,7 @@ struct NetBoxVLANsDashboard: View {
                 }
             }
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
+        .listStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
             if let themeID = output.object as? String {

@@ -161,6 +161,8 @@ struct SiteDetailView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .alternatingRowBackgrounds(.disabled)
         .foregroundStyle(selectedTheme.foregroundColor)
         #else
         List {

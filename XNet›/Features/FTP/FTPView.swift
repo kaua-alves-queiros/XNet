@@ -5,7 +5,7 @@ import SwiftData
 struct FTPView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var connectionManager = FTPConnectionManager()
-    @State private var registeredDevices: [TerminalDevice] = []
+    @State private var registeredDevices: [XNetTerminalDevice] = []
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     
     // Connection Settings
@@ -61,7 +61,7 @@ struct FTPView: View {
         .onAppear {
             loadRegisteredDevices()
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TerminalDevicesUpdated"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("XNetTerminalDevicesUpdated"))) { _ in
             loadRegisteredDevices()
         }
         .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
@@ -276,7 +276,7 @@ struct FTPView: View {
         )
     }
     
-    private func transferDeviceCard(_ device: TerminalDevice) -> some View {
+    private func transferDeviceCard(_ device: XNetTerminalDevice) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
                 connectToDevice(device, protocolOverride: preferredProtocol(for: device))
@@ -327,7 +327,7 @@ struct FTPView: View {
         )
     }
     
-    private func quickConnectButton(_ title: String, protocolType: TransferProtocolType, device: TerminalDevice, tint: Color) -> some View {
+    private func quickConnectButton(_ title: String, protocolType: TransferProtocolType, device: XNetTerminalDevice, tint: Color) -> some View {
         Button {
             connectToDevice(device, protocolOverride: protocolType)
         } label: {
@@ -349,21 +349,15 @@ struct FTPView: View {
     }
     
     private func loadRegisteredDevices() {
-        let descriptor = FetchDescriptor<TerminalDevice>(sortBy: [SortDescriptor(\.groupName, order: .forward), SortDescriptor(\.name, order: .forward)])
-        let rows = (try? modelContext.fetch(descriptor)) ?? []
-        if !rows.isEmpty {
-            registeredDevices = rows
-        } else if let cached = cachedTransferDevices(), !cached.isEmpty {
+        if let data = UserDefaults.standard.data(forKey: XNetTerminalDevice.storageKey),
+           let cached = try? JSONDecoder().decode([XNetTerminalDevice].self, from: data) {
             registeredDevices = cached
         } else {
             registeredDevices = []
         }
-        if !availableGroupFilters.contains(selectedGroupFilter) {
-            selectedGroupFilter = "Todos"
-        }
     }
     
-    private func applyDeviceToFTP(_ device: TerminalDevice, protocolOverride: TransferProtocolType? = nil) {
+    private func applyDeviceToFTP(_ device: XNetTerminalDevice, protocolOverride: TransferProtocolType? = nil) {
         selectedCredentialID = device.credentialID
         host = device.host
         username = device.username
@@ -373,7 +367,7 @@ struct FTPView: View {
         port = resolvedPort(for: device, protocolType: resolvedProtocol)
     }
     
-    private func connectToDevice(_ device: TerminalDevice, protocolOverride: TransferProtocolType? = nil) {
+    private func connectToDevice(_ device: XNetTerminalDevice, protocolOverride: TransferProtocolType? = nil) {
         applyDeviceToFTP(device, protocolOverride: protocolOverride)
         if connectionManager.isConnected {
             connectionManager.disconnect()
@@ -394,7 +388,7 @@ struct FTPView: View {
         port = resolvedPort(for: activeDevice, protocolType: protocolType)
     }
     
-    private func preferredProtocol(for device: TerminalDevice) -> TransferProtocolType {
+    private func preferredProtocol(for device: XNetTerminalDevice) -> TransferProtocolType {
         let type = device.connectionType.uppercased()
         if type.contains("SCP") {
             return .scp
@@ -405,7 +399,7 @@ struct FTPView: View {
         return .sftp
     }
     
-    private func resolvedPort(for device: TerminalDevice, protocolType: TransferProtocolType) -> String {
+    private func resolvedPort(for device: XNetTerminalDevice, protocolType: TransferProtocolType) -> String {
         let trimmedPort = device.port.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedPort.isEmpty {
             return trimmedPort
@@ -418,7 +412,7 @@ struct FTPView: View {
         }
     }
     
-    private func protocolIcon(_ device: TerminalDevice) -> String {
+    private func protocolIcon(_ device: XNetTerminalDevice) -> String {
         let type = device.connectionType.uppercased()
         if type.contains("FTP") && !type.contains("SFTP") {
             return "externaldrive.connected.to.line.below"
@@ -434,14 +428,14 @@ struct FTPView: View {
         return ["Todos"] + names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
     
-    private var transferCapableDevices: [TerminalDevice] {
+    private var transferCapableDevices: [XNetTerminalDevice] {
         registeredDevices.filter {
             !$0.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && $0.connectionType.localizedCaseInsensitiveCompare("Serial") != .orderedSame
         }
     }
     
-    private var filteredRegisteredDevices: [TerminalDevice] {
+    private var filteredRegisteredDevices: [XNetTerminalDevice] {
         let search = deviceSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         return transferCapableDevices.filter { device in
             let matchesGroup = selectedGroupFilter == "Todos" || normalizedGroupName(device.groupName) == selectedGroupFilter
@@ -454,7 +448,7 @@ struct FTPView: View {
         }
     }
     
-    private var groupedTransferDevices: [(group: String, devices: [TerminalDevice])] {
+    private var groupedTransferDevices: [(group: String, devices: [XNetTerminalDevice])] {
         let grouped = Dictionary(grouping: filteredRegisteredDevices) { normalizedGroupName($0.groupName) }
         return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { key in
             let devices = (grouped[key] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -467,22 +461,24 @@ struct FTPView: View {
         return trimmed.isEmpty ? "Geral" : trimmed
     }
     
-    private func cachedTransferDevices() -> [TerminalDevice]? {
+    private func cachedTransferDevices() -> [XNetTerminalDevice]? {
         let decoder = JSONDecoder()
         for key in [TransferDeviceCacheEntry.storageKeyV3, TransferDeviceCacheEntry.storageKeyV2] {
             guard let data = UserDefaults.standard.data(forKey: key),
                   let cached = try? decoder.decode([TransferDeviceCacheEntry].self, from: data),
                   !cached.isEmpty else { continue }
             return cached.map {
-                TerminalDevice(
+                XNetTerminalDevice(
+                    id: UUID(),
                     name: $0.name,
                     groupName: normalizedGroupName($0.groupName),
                     connectionType: $0.connectionType,
                     host: $0.host,
                     port: $0.port,
                     username: $0.username,
+                    credentialID: $0.credentialID,
                     notes: $0.notes,
-                    credentialID: $0.credentialID
+                    createdAt: Date()
                 )
             }
         }
@@ -659,6 +655,7 @@ struct LocalFileBrowser: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .onAppear { loadFiles() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LocalBrowserRefresh"))) { _ in
@@ -841,6 +838,7 @@ struct RemoteFileBrowser: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .alternatingRowBackgrounds(.disabled)
             }
         }
     }
