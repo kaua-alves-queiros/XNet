@@ -1,0 +1,263 @@
+@page "/"
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+@inject IMemoryCache Cache
+@using Microsoft.Extensions.Caching.Memory
+
+<PageTitle>XNet› - Professional Network Intelligence</PageTitle>
+
+<!-- Unified Apple Nav -->
+<header class="apple-nav" id="overview">
+    <div class="nav-container">
+        <a href="#overview" class="nav-logo">
+            <img src="assets/logo.png" width="32" height="32" alt="logo" />
+            XNet›
+        </a>
+        <div class="nav-links">
+            <a href="#capabilities">Capabilities</a>
+            <a href="/documentation">Documentation</a>
+            <a href="/documentation/github">GitHub</a>
+            <a href="/downloads" class="apple-btn-blue text-white">Download <i class="bi bi-chevron-right ms-1 small"></i></a>
+        </div>
+    </div>
+</header>
+
+<!-- Hero Section -->
+<main>
+    <section class="hero animate-fade">
+        <img src="assets/logo.png" alt="XNet Icon" class="hero-icon" />
+        <h1 class="hero-title">XNet›</h1>
+        <p class="hero-description">
+            XNet offers the tools you need to explore, test, and audit network environments. 
+            Native performance, open source, and built for modern engineering on macOS.
+        </p>
+        <div class="hero-actions">
+            <a href="/downloads" class="apple-btn-blue px-4 py-2 text-white me-3">Download XNet</a>
+            <a href="/documentation/github" class="link-blue fw-medium fs-5">View on GitHub <i class="bi bi-chevron-right ms-1 small"></i></a>
+        </div>
+        
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section py-5 text-center" id="team">
+        <div class="container-apple">
+            <h2 class="display-5 fw-bold text-white mb-2">Development Team</h2>
+            <p class="text-sf-secondary mb-5">The innovation behind XNet is driven by a passionate community of engineers.</p>
+            
+            <div class="row g-4 justify-content-center">
+                @foreach (var dev in contributors)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <a href="@dev.HtmlUrl" target="_blank" class="text-decoration-none h-100 d-block">
+                            <div class="feature-card h-100 text-start p-4 d-flex flex-column align-items-center text-center">
+                                <img src="@dev.AvatarUrl" class="rounded-circle mb-4 border border-2 border-dark" style="width: 100px; height: 100px; object-fit: cover;" />
+                                <h3 class="h4 fw-bold mb-2">@dev.Name</h3>
+                                <p class="small text-muted mb-3" style="font-size: 13px; line-height: 1.4;">@(dev.Bio ?? "Core Contributor")</p>
+                                @if (!string.IsNullOrEmpty(dev.Company))
+                                {
+                                    <p class="fw-bold mb-3" style="color: #4cd964; font-size: 14px;">@dev.Company</p>
+                                }
+                                <div class="mt-auto pt-3 w-100">
+                                    <span class="text-muted small">@dev.Contributions commits</span>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- Capabilities Section -->
+    <section class="py-5" id="capabilities">
+        <div class="container-apple">
+            <div class="text-center mb-5">
+                <h2 class="display-5 fw-bold text-white mb-2">Capabilities</h2>
+                <p class="text-sf-secondary">Professional-grade networking tools integrated into a seamless macOS experience.</p>
+            </div>
+
+            <div class="row g-4">
+                <!-- Capability 1: Advanced Terminal -->
+                <div class="col-lg-6 mb-5">
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-4 border-bottom border-dark">
+                            <span class="badge bg-primary-subtle text-primary rounded-pill mb-2">Operations</span>
+                            <h3 class="h4 text-white">Unified Terminal</h3>
+                            <p class="text-sf-secondary">High-fidelity SSH, Telnet, and Serial emulation with smart tab management.</p>
+                        </div>
+                        <img src="assets/screenshots/terminal.png" class="img-fluid screen-mockup" alt="Terminal UI" />
+                    </div>
+                </div>
+
+                <!-- Capability 2: IP Scanner -->
+                <div class="col-lg-6 mb-5">
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-4 border-bottom border-dark">
+                            <span class="badge bg-info-subtle text-info rounded-pill mb-2">Intelligence</span>
+                            <h3 class="h4 text-white">IP Scanner</h3>
+                            <p class="text-sf-secondary">Rapid subnet discovery with vendor identification and deep device probing.</p>
+                        </div>
+                        <img src="assets/screenshots/ip_scan.png" class="img-fluid screen-mockup" alt="IP Scanner UI" />
+                    </div>
+                </div>
+
+                <!-- Capability 3: Subnet Planning -->
+                <div class="col-lg-6 mb-5">
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-4 border-bottom border-dark">
+                            <span class="badge bg-warning-subtle text-warning rounded-pill mb-2">Planning</span>
+                            <h3 class="h4 text-white">Advanced IP Planner</h3>
+                            <p class="text-sf-secondary">Visual subnet calculator with VLSM breakdown and binary-level precision.</p>
+                        </div>
+                        <img src="assets/screenshots/subnet.png" class="img-fluid screen-mockup" alt="Subnet UI" />
+                    </div>
+                </div>
+
+                <!-- Capability 4: Visual Monitoring -->
+                <div class="col-lg-6 mb-5">
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-4 border-bottom border-dark">
+                            <span class="badge bg-danger-subtle text-danger rounded-pill mb-2">Diagnostics</span>
+                            <h3 class="h4 text-white">Visual Ping</h3>
+                            <p class="text-sf-secondary">Monitor host reachability with real-time latency graphs and diagnostic stats.</p>
+                        </div>
+                        <img src="assets/screenshots/ping.png" class="img-fluid w-100" alt="Ping UI" style="border-top: 1px solid var(--apple-border);" />
+                    </div>
+                </div>
+            <!-- Capability 5: Dashboards -->
+            <div class="col-lg-6 mb-5">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 border-bottom border-dark">
+                        <span class="badge bg-success-subtle text-success rounded-pill mb-2">Network Viz</span>
+                        <h3 class="h4 text-white">Unified Dashboard</h3>
+                        <p class="text-sf-secondary">Real-time overview of your infrastructure health and active discoveries.</p>
+                    </div>
+                    <img src="assets/screenshots/dashboard.png" class="img-fluid screen-mockup" alt="Dashboard" />
+                </div>
+            </div>
+
+            <!-- Capability 6: Diagnostics -->
+            <div class="col-lg-6 mb-5">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 border-bottom border-dark">
+                        <span class="badge bg-danger-subtle text-danger rounded-pill mb-2">Diagnostics</span>
+                        <h3 class="h4 text-white">Traceroute Analytics</h3>
+                        <p class="text-sf-secondary">Deep path discovery with latency monitoring per hop.</p>
+                    </div>
+                    <img src="assets/screenshots/traceroute.png" class="img-fluid screen-mockup" alt="Traceroute" />
+                </div>
+            </div>
+
+            <!-- Capability 7: Port Scanning -->
+            <div class="col-lg-6 mb-5">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 border-bottom border-dark">
+                        <span class="badge bg-warning-subtle text-warning rounded-pill mb-2">Security</span>
+                        <h3 class="h4 text-white">Port Audit</h3>
+                        <p class="text-sf-secondary">Identify exposed services across entire subnets with millisecond precision.</p>
+                    </div>
+                    <img src="assets/screenshots/port.png" class="img-fluid screen-mockup" alt="Port Scanner" />
+                </div>
+            </div>
+
+            <!-- Capability 8: FTP Transfer -->
+            <div class="col-lg-6 mb-5">
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 border-bottom border-dark">
+                        <span class="badge bg-info-subtle text-info rounded-pill mb-2">Operations</span>
+                        <h3 class="h4 text-white">Secure File Transfer</h3>
+                        <p class="text-sf-secondary">Native FTP/SFTP orchestration integrated into your terminal workflow.</p>
+                    </div>
+                    <img src="assets/screenshots/ftp.png" class="img-fluid screen-mockup" alt="FTP Transfer" />
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+@code {
+    private List<GitHubContributor> contributors = new();
+    private const string CacheKey = "GitHubContributorsCache";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Cache.TryGetValue(CacheKey, out List<GitHubContributor>? cachedContributors))
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/kaua-alves-queiros/XNet/contributors");
+                request.Headers.Add("User-Agent", "XNet-Web");
+
+                var response = await Http.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var basicList = JsonSerializer.Deserialize<List<GitHubContributor>>(json, new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    });
+
+                    if (basicList != null)
+                    {
+                        // Fetch full profile for each contributor to get Bio, Name, and Company
+                        foreach (var dev in basicList)
+                        {
+                            var userReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/users/{dev.Login}");
+                            userReq.Headers.Add("User-Agent", "XNet-Web");
+                            var userRes = await Http.SendAsync(userReq);
+                            if (userRes.IsSuccessStatusCode)
+                            {
+                                var userJson = await userRes.Content.ReadAsStringAsync();
+                                var profile = JsonSerializer.Deserialize<GitHubUserProfile>(userJson, new JsonSerializerOptions 
+                                { 
+                                    PropertyNameCaseInsensitive = true 
+                                });
+
+                                if (profile != null)
+                                {
+                                    dev.Name = profile.Name ?? dev.Login;
+                                    dev.Bio = profile.Bio;
+                                    dev.Company = profile.Company;
+                                }
+                            }
+                        }
+                        contributors = basicList;
+                        
+                        // Set cache for 7 days
+                        var cacheEntryOptions = new MemoryCacheEntryOptions()
+                            .SetAbsoluteExpiration(TimeSpan.FromDays(7));
+                        
+                        Cache.Set(CacheKey, contributors, cacheEntryOptions);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching team: {ex.Message}");
+            }
+        }
+        else
+        {
+            contributors = cachedContributors!;
+        }
+    }
+
+    public class GitHubUserProfile
+    {
+        [JsonPropertyName("name")] public string? Name { get; set; }
+        [JsonPropertyName("bio")] public string? Bio { get; set; }
+        [JsonPropertyName("company")] public string? Company { get; set; }
+    }
+
+    public class GitHubContributor
+    {
+        [JsonPropertyName("login")] public string Login { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Bio { get; set; }
+        public string? Company { get; set; }
+        [JsonPropertyName("avatar_url")] public string AvatarUrl { get; set; } = string.Empty;
+        [JsonPropertyName("html_url")] public string HtmlUrl { get; set; } = string.Empty;
+        [JsonPropertyName("contributions")] public int Contributions { get; set; }
+    }
+}
