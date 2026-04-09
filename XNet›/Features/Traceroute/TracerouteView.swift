@@ -1,8 +1,3 @@
-//
-//  TracerouteView.swift
-//  XNet›
-//
-
 import SwiftUI
 
 struct TracerouteView: View {
@@ -11,6 +6,11 @@ struct TracerouteView: View {
     @State private var hops: [TracerouteHop] = []
     @State private var isRunning = false
     @State private var currentTask: Task<Void, Never>? = nil
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -20,9 +20,10 @@ struct TracerouteView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Route Trace")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(selectedTheme.foregroundColor)
                         Text(isRunning ? "Tracing route to \(targetHost)..." : "Map the path to a remote host")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(selectedTheme.mutedColor)
                     }
                     
                     Spacer()
@@ -43,7 +44,7 @@ struct TracerouteView: View {
                             .frame(width: 100)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(isRunning ? .red : .blue)
+                        .tint(isRunning ? .red : selectedTheme.accentColor)
                         .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -61,11 +62,11 @@ struct TracerouteView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color(NSColor.textBackgroundColor))
+                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.6))
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            .stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1)
                     )
                     .disabled(isRunning)
                     
@@ -83,11 +84,7 @@ struct TracerouteView: View {
             .padding(.horizontal, 28)
             .padding(.top, 32)
             .padding(.bottom, 24)
-            .background(Color(NSColor.windowBackgroundColor))
 
-            
-            Divider()
-            
             // Modern Results Table
             Table(hops) {
                 TableColumn("Hop") { hop in
@@ -101,30 +98,46 @@ struct TracerouteView: View {
                     Text(hop.ip)
                         .font(.system(.body, design: .monospaced))
                         .bold()
+                        .foregroundStyle(selectedTheme.foregroundColor)
                 }
                 .width(180)
                 
                 TableColumn("T1") { hop in 
                     Text(hop.time1)
                         .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(hop.time1.contains("*") ? .red : .primary)
+                        .foregroundStyle(hop.time1.contains("*") ? .red : selectedTheme.foregroundColor)
                 }
                 
                 TableColumn("T2") { hop in 
                     Text(hop.time2)
                         .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(hop.time2.contains("*") ? .red : .primary)
+                        .foregroundStyle(hop.time2.contains("*") ? .red : selectedTheme.foregroundColor)
                 }
                 
                 TableColumn("T3") { hop in 
                     Text(hop.time3)
                         .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(hop.time3.contains("*") ? .red : .primary)
+                        .foregroundStyle(hop.time3.contains("*") ? .red : selectedTheme.foregroundColor)
                 }
             }
             .tableStyle(.inset)
+            .scrollContentBackground(.hidden)
         }
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
         .navigationTitle("Traceroute Diagnostic")
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            } else {
+                selectedThemeID = TerminalThemeStore.readThemeID()
+            }
+        }
         .onDisappear {
             stopTrace()
         }
