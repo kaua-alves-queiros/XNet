@@ -124,9 +124,21 @@ a.text-white:hover {
     margin: 0 auto;
 }
 
+.container-apple {
+    max-width: 1024px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+/* Page Spacing */
 .hero {
+    padding: 120px 20px 80px 20px;
     text-align: center;
-    padding: 100px 20px;
+}
+
+.main-page {
+    padding-top: 100px;
+    padding-bottom: 80px;
 }
 
 .hero-icon {
@@ -197,8 +209,8 @@ a.text-white:hover {
 /* Documentation Sidebar Layout */
 .doc-wrapper {
     display: flex;
-    gap: 40px;
-    margin-top: 40px;
+    gap: 60px;
+    padding-top: 80px;
 }
 
 .doc-sidebar {
@@ -209,37 +221,78 @@ a.text-white:hover {
     overflow-y: auto;
     padding-right: 20px;
     flex-shrink: 0;
+    mask-image: linear-gradient(to bottom, black 95%, transparent 100%);
+}
+
+/* Custom Scrollbar for Sidebar */
+.doc-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.doc-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.doc-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.doc-sidebar:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .doc-sidebar-section {
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
 .doc-sidebar-title {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--apple-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    padding-left: 12px;
 }
 
 .doc-sidebar-link {
-    display: block;
-    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
     font-size: 14px;
     color: var(--apple-text);
     text-decoration: none;
-    transition: color 0.2s;
+    border-radius: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 2px;
+}
+
+.doc-sidebar-link i {
+    margin-right: 10px;
+    font-size: 16px;
+    opacity: 0.7;
+    width: 20px;
+    text-align: center;
 }
 
 .doc-sidebar-link:hover {
-    color: var(--apple-accent);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--apple-text-white);
+}
+
+.doc-sidebar-link:hover i {
+    opacity: 1;
 }
 
 .doc-sidebar-link.active {
-    color: var(--apple-accent);
+    background: var(--apple-accent);
+    color: #ffffff;
     font-weight: 500;
+}
+
+.doc-sidebar-link.active i {
+    opacity: 1;
 }
 
 .doc-main-content {
