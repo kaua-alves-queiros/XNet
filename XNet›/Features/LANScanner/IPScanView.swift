@@ -238,8 +238,9 @@ struct QuickDocumentSheet: View {
     @Environment(\.dismiss) private var dismiss
     let device: ScannedDevice
     
-    var theme: TerminalTheme {
-        TerminalTheme(rawValue: TerminalThemeStore.readThemeID()) ?? .defaultTheme
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
     }
     
     @State private var name: String = ""
@@ -252,35 +253,38 @@ struct QuickDocumentSheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Quick Document")
+                    Text("Documentação Rápida")
                         .font(.headline)
-                        .foregroundStyle(theme.foregroundColor)
-                    Text("Pre-configuration snapshot for \(device.ip)")
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    Text("Snapshot de pré-configuração para \(device.ip)")
                         .font(.caption)
-                        .foregroundStyle(theme.mutedColor)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 }
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.mutedColor) }.buttonStyle(.plain)
+                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(selectedTheme.mutedColor) }.buttonStyle(.plain)
             }
             .padding()
-            .background(theme.chromeTopColor)
+            .background(selectedTheme.chromeTopColor)
             
             Form {
-                Section("Identity") {
-                    TextField("Device Name", text: $name)
-                    TextField("Device Type", text: $type)
+                Section("Identidade") {
+                    TextField("Nome do Dispositivo", text: $name)
+                    TextField("Tipo", text: $type)
                 }
                 
-                Section("Diagnostic Notes (Draft Configuration)") {
+                Section("Notas de Diagnóstico") {
                     TextEditor(text: $notes)
                         .frame(height: 120)
                         .font(.system(.body, design: .monospaced))
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.primary.opacity(0.1), lineWidth: 1))
+                        .padding(4)
+                        .background(selectedTheme.backgroundColor.opacity(0.3))
+                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
                 }
                 
-                Section("Metadata") {
-                    Picker("Inventory Site", selection: $selectedSiteID) {
-                        Text("Global / Default").tag(nil as PersistentIdentifier?)
+                Section("Metadados") {
+                    Picker("Site de Inventário", selection: $selectedSiteID) {
+                        Text("Global / Padrão").tag(nil as PersistentIdentifier?)
                         ForEach(sites) { site in
                             Text(site.name).tag(site.id as PersistentIdentifier?)
                         }
@@ -288,22 +292,30 @@ struct QuickDocumentSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             
             HStack {
-                Button("Cancel") { dismiss() }
+                Button("Cancelar") { dismiss() }
                 Spacer()
-                Button("Save Documentation") {
+                Button("Salvar Documentation") {
                     save()
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
             }
             .padding()
         }
+        .background(selectedTheme.backgroundColor)
         .onAppear {
             name = device.hostname.isEmpty ? "Device-\(device.ip.split(separator: ".").last ?? "")" : device.hostname
             type = device.vendor.isEmpty ? "Network Node" : device.vendor
             notes = "// Snapshot: \(Date().formatted())\n// Discovered MAC: \(device.mac)\n// Initial Discovery Stats: \n\n"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
         }
     }
     

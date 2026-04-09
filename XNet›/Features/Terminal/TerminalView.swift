@@ -1475,40 +1475,52 @@ private struct TerminalSnippetLibrarySheet: View {
     let editingSnippet: TerminalSnippetEntry?
     
     @State private var showingForm = false
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Snippets")
+                    Text("Biblioteca de Snippets")
                         .font(.title3.bold())
+                        .foregroundStyle(selectedTheme.foregroundColor)
                     Text("Comandos persistentes para reuso rápido")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 }
                 Spacer()
-                Button("Fechar") {
-                    dismiss()
-                }
                 Button {
                     onAdd()
                     showingForm = true
                 } label: {
-                    Label("Novo", systemImage: "plus")
+                    Label("Novo Snippet", systemImage: "plus")
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
                 .keyboardShortcut(.defaultAction)
+                
+                Button("Fechar") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
             }
             
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(selectedTheme.mutedColor)
                 TextField("Buscar snippet", text: $searchText)
                     .textFieldStyle(.plain)
+                    .foregroundStyle(selectedTheme.foregroundColor)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.primary.opacity(0.06))
+            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.6))
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1))
             
             ScrollView {
                 LazyVStack(spacing: 12) {
@@ -1518,10 +1530,11 @@ private struct TerminalSnippetLibrarySheet: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(snippet.title)
                                         .font(.headline)
+                                        .foregroundStyle(selectedTheme.foregroundColor)
                                     if !snippet.notes.isEmpty {
                                         Text(snippet.notes)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(selectedTheme.mutedColor)
                                     }
                                 }
                                 
@@ -1532,7 +1545,8 @@ private struct TerminalSnippetLibrarySheet: View {
                                         .font(.system(size: 10, weight: .semibold))
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(Color.accentColor.opacity(0.12))
+                                        .background(selectedTheme.accentColor.opacity(0.12))
+                                        .foregroundStyle(selectedTheme.accentColor)
                                         .clipShape(Capsule())
                                 }
                             }
@@ -1540,11 +1554,13 @@ private struct TerminalSnippetLibrarySheet: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 Text(snippet.command)
                                     .font(.system(.body, design: .monospaced))
+                                    .foregroundStyle(selectedTheme.foregroundColor)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(10)
+                                    .padding(12)
                             }
-                            .background(Color.primary.opacity(0.05))
+                            .background(selectedTheme.backgroundColor.opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
                             
                             HStack {
                                 Button {
@@ -1572,37 +1588,52 @@ private struct TerminalSnippetLibrarySheet: View {
                                     Label("Executar", systemImage: "paperplane.fill")
                                 }
                                 .buttonStyle(.borderedProminent)
+                                .tint(selectedTheme.accentColor)
                                 .controlSize(.small)
                                 .disabled(!canSend)
                             }
                         }
                         .padding(14)
-                        .background(Color.primary.opacity(0.04))
+                        .background(selectedTheme.cardBackgroundColor.opacity(0.3))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selectedTheme.panelBorderColor.opacity(0.25), lineWidth: 1))
                     }
                     
                     if snippets.isEmpty {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 14) {
                             Image(systemName: "terminal.textbox")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 40))
+                                .foregroundStyle(selectedTheme.mutedColor.opacity(0.5))
                             Text("Nenhum snippet cadastrado")
                                 .font(.headline)
+                                .foregroundStyle(selectedTheme.foregroundColor)
                             Text("Crie comandos prontos para executar no terminal sem redigitar.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                                .foregroundStyle(selectedTheme.mutedColor)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 36)
+                        .padding(.vertical, 48)
                     }
                 }
             }
         }
-        .padding(18)
+        .padding(24)
         .frame(width: 760, height: 560)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .sheet(isPresented: $showingForm) {
             TerminalSnippetFormSheet(snippetToEdit: editingSnippet, onSave: onSave)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
         }
     }
 }
@@ -1618,35 +1649,56 @@ private struct TerminalSnippetFormSheet: View {
     @State private var notes = ""
     @State private var sendReturn = true
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             Text(snippetToEdit == nil ? "Novo Snippet" : "Editar Snippet")
-                .font(.title3.bold())
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(selectedTheme.foregroundColor)
             
             Form {
-                TextField("Nome", text: $title)
-                Toggle("Enviar ENTER ao final", isOn: $sendReturn)
-                TextField("Notas", text: $notes)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Comando")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Section {
+                    TextField("Nome do comando", text: $title)
+                    Toggle("Transmitir ENTER (CRLF)", isOn: $sendReturn)
+                } header: {
+                    Text("IDENTIDADE").font(.caption2).bold()
+                }
+                
+                Section {
                     TextEditor(text: $command)
                         .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 180)
-                        .padding(6)
-                        .background(Color.primary.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .frame(minHeight: 140)
+                        .padding(8)
+                        .background(selectedTheme.backgroundColor.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
+                } header: {
+                    Text("CÓDIGO FONTE / COMANDO").font(.caption2).bold()
+                }
+
+                Section {
+                    TextField("Descrição curta", text: $notes)
+                } header: {
+                    Text("NOTAS").font(.caption2).bold()
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             
-            HStack {
-                Spacer()
-                Button("Cancelar", role: .cancel) {
+            HStack(spacing: 16) {
+                Button("Cancelar") {
                     dismiss()
                 }
-                Button("Salvar") {
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                
+                Spacer()
+                
+                Button("Gravar Snippet") {
                     onSave(
                         TerminalSnippetPayload(
                             title: title,
@@ -1657,18 +1709,35 @@ private struct TerminalSnippetFormSheet: View {
                     )
                     dismiss()
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
+                .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
         }
-        .padding(18)
-        .frame(width: 560, height: 430)
+        .padding(.vertical, 24)
+        .frame(width: 520, height: 580)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .onAppear {
             guard let snippetToEdit else { return }
             title = snippetToEdit.title
             command = snippetToEdit.command
             notes = snippetToEdit.notes
             sendReturn = snippetToEdit.sendReturn
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
         }
     }
 }
@@ -1688,37 +1757,48 @@ private struct TerminalLogHistorySheet: View {
         return formatter
     }()
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Logs Persistentes")
+                    Text("Histórico de Sessões")
                         .font(.title3.bold())
-                    Text("Histórico das sessões encerradas ou trocadas")
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                    Text("Logs persistentes de atividades anteriores")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(selectedTheme.mutedColor)
                 }
                 Spacer()
                 if !logs.isEmpty {
                     Button("Limpar Tudo", role: .destructive) {
                         onClear()
                     }
+                    .buttonStyle(.bordered)
                 }
                 Button("Fechar") {
                     dismiss()
                 }
+                .buttonStyle(.bordered)
+                .tint(selectedTheme.accentColor)
             }
             
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(selectedTheme.mutedColor)
                 TextField("Buscar por host, usuário ou conteúdo", text: $searchText)
                     .textFieldStyle(.plain)
+                    .foregroundStyle(selectedTheme.foregroundColor)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.primary.opacity(0.06))
+            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.95 : 0.6))
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.3), lineWidth: 1))
             
             ScrollView {
                 LazyVStack(spacing: 12) {
@@ -1728,12 +1808,13 @@ private struct TerminalLogHistorySheet: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.title)
                                         .font(.headline)
+                                        .foregroundStyle(selectedTheme.foregroundColor)
                                     Text(entry.subtitle)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(selectedTheme.mutedColor)
                                     Text("Início: \(formatter.string(from: entry.startedAt)) • Fim: \(formatter.string(from: entry.endedAt))")
                                         .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(selectedTheme.mutedColor.opacity(0.8))
                                 }
                                 Spacer()
                                 Button(role: .destructive) {
@@ -1748,37 +1829,53 @@ private struct TerminalLogHistorySheet: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 Text(entry.content)
                                     .font(.system(.body, design: .monospaced))
+                                    .foregroundStyle(selectedTheme.foregroundColor)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(10)
+                                    .padding(12)
                             }
-                            .background(Color.primary.opacity(0.05))
+                            .background(selectedTheme.backgroundColor.opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
                         }
                         .padding(14)
-                        .background(Color.primary.opacity(0.04))
+                        .background(selectedTheme.cardBackgroundColor.opacity(0.3))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selectedTheme.panelBorderColor.opacity(0.2), lineWidth: 1))
                     }
                     
                     if logs.isEmpty {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 14) {
                             Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.secondary)
-                            Text("Nenhum log salvo")
+                                .font(.system(size: 40))
+                                .foregroundStyle(selectedTheme.mutedColor.opacity(0.5))
+                            Text("Nenhum log disponível")
                                 .font(.headline)
-                            Text("Os logs das sessões passam a ser preservados localmente conforme você desconecta, fecha abas ou inicia uma nova sessão.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(selectedTheme.foregroundColor)
+                            Text("As sessões encerradas aparecem aqui automaticamente.")
+                                .font(.subheadline)
+                                .foregroundStyle(selectedTheme.mutedColor)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 36)
+                        .padding(.vertical, 48)
                     }
                 }
             }
         }
-        .padding(18)
-        .frame(width: 860, height: 600)
+        .padding(24)
+        .frame(width: 860, height: 620)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
+        }
     }
 }
 
@@ -1798,38 +1895,68 @@ private struct TerminalDeviceFormSheet: View {
     @State private var password = ""
     @State private var notes = ""
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             Text(deviceToEdit == nil ? "Novo Dispositivo" : "Editar Dispositivo")
-                .font(.title3.bold())
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(selectedTheme.foregroundColor)
             
             Form {
-                TextField("Nome", text: $name)
-                Picker("Grupo/Pasta", selection: $groupName) {
-                    ForEach(availableGroups, id: \.self) { group in
-                        Text(group).tag(group)
+                Section {
+                    TextField("Nome", text: $name)
+                    Picker("Grupo/Pasta", selection: $groupName) {
+                        ForEach(availableGroups, id: \.self) { group in
+                            Text(group).tag(group)
+                        }
+                    }
+                } header: {
+                    Text("IDENTIFICAÇÃO").font(.caption2).bold()
+                }
+                
+                Section {
+                    Picker("Tipo de Conexão", selection: $connectionType) {
+                        ForEach(TerminalView.ConnectionType.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    TextField(connectionType == .serial ? "Porta serial" : "Host/IP", text: $host)
+                    TextField(connectionType == .serial ? "Baud rate" : "Porta", text: $port)
+                } header: {
+                    Text("CONECTIVIDADE").font(.caption2).bold()
+                }
+
+                if connectionType == .ssh || connectionType != .serial {
+                    Section {
+                        if connectionType == .ssh {
+                            TextField("Usuário", text: $username)
+                        }
+                        SecureField("Senha", text: $password)
+                    } header: {
+                        Text("AUTENTICAÇÃO").font(.caption2).bold()
                     }
                 }
-                Picker("Tipo", selection: $connectionType) {
-                    ForEach(TerminalView.ConnectionType.allCases) { Text($0.rawValue).tag($0) }
+
+                Section {
+                    TextField("Notas/Observações", text: $notes)
+                } header: {
+                    Text("DIVERSOS").font(.caption2).bold()
                 }
-                TextField(connectionType == .serial ? "Porta serial" : "Host/IP", text: $host)
-                TextField(connectionType == .serial ? "Baud rate" : "Porta", text: $port)
-                if connectionType == .ssh {
-                    TextField("Usuário", text: $username)
-                }
-                if connectionType != .serial {
-                    SecureField("Senha", text: $password)
-                }
-                TextField("Notas", text: $notes)
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             
-            HStack {
-                Spacer()
-                Button("Cancelar", role: .cancel) {
+            HStack(spacing: 16) {
+                Button("Cancelar") {
                     dismiss()
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                
+                Spacer()
+                
                 Button("Salvar") {
                     onSave(
                         TerminalDevicePayload(
@@ -1845,15 +1972,27 @@ private struct TerminalDeviceFormSheet: View {
                     )
                     dismiss()
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
+                .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .disabled(host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && connectionType != .serial)
             }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
         }
-        .padding(18)
-        .frame(width: 460)
+        .padding(.vertical, 24)
+        .frame(width: 480, height: 620)
+        .background(
+            LinearGradient(
+                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .onAppear {
             if let firstGroup = availableGroups.first {
-                groupName = firstGroup
+                if groupName == "Geral" { groupName = firstGroup }
             }
             guard let device = deviceToEdit else { return }
             name = device.name
@@ -1864,6 +2003,11 @@ private struct TerminalDeviceFormSheet: View {
             username = device.username
             password = TerminalPasswordStore.readPassword(credentialID: device.credentialID) ?? ""
             notes = device.notes
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
         }
         .onChange(of: connectionType) { _, value in
             if deviceToEdit != nil { return }
@@ -1885,31 +2029,44 @@ private struct TerminalDeviceGroupFormSheet: View {
     
     let onSave: (String) -> Void
     
+    @State private var selectedThemeID = TerminalThemeStore.readThemeID()
+    private var selectedTheme: TerminalTheme {
+        TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Nova Pasta")
-                .font(.title3.bold())
+        VStack(spacing: 20) {
+            Text("Nova Pasta de Rede")
+                .font(.headline)
+                .foregroundStyle(selectedTheme.foregroundColor)
             
             Form {
                 TextField("Nome da pasta", text: $name)
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             
             HStack {
+                Button("Cancelar") { dismiss() }
                 Spacer()
-                Button("Cancelar", role: .cancel) {
-                    dismiss()
-                }
-                Button("Salvar") {
+                Button("Criar") {
                     onSave(name)
                     dismiss()
                 }
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .tint(selectedTheme.accentColor)
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
-        .padding(18)
-        .frame(width: 360)
+        .padding(24)
+        .frame(width: 320)
+        .background(selectedTheme.backgroundColor)
+        .cornerRadius(16)
+        .onReceive(NotificationCenter.default.publisher(for: TerminalThemeStore.didChangeNotification)) { output in
+            if let themeID = output.object as? String {
+                selectedThemeID = themeID
+            }
+        }
     }
 }
 
