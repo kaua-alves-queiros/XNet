@@ -12,6 +12,7 @@ import Observation
 class TerminalConnectionManager {
     var logs: String = ""
     var isConnected: Bool = false
+    private var shouldClearLineOnNextChar: Bool = false
     
     private var sshProcess: Process?
     private var pipeIn: Pipe?
@@ -202,20 +203,59 @@ class TerminalConnectionManager {
     
     private func processIncomingData(_ newString: String) {
         var current = self.logs
-        for scalar in newString.unicodeScalars {
-            switch scalar.value {
-            case 8, 127:
-                if !current.isEmpty {
+        let chars = Array(newString)
+        var i = 0
+        
+        while i < chars.count {
+            let char = chars[i]
+            
+            if char == "\r" {
+                if i + 1 < chars.count && chars[i+1] == "\n" {
+                    current.append("\n")
+                    i += 2
+                } else {
+                    // CR: Row reset
+                    if let lastNL = current.lastIndex(of: "\n") {
+                        current.removeSubrange(current.index(after: lastNL)..<current.endIndex)
+                    } else { current = "" }
+                    i += 1
+                }
+            } else if char == "\n" {
+                current.append("\n")
+                i += 1
+            } else if char == "\u{08}" { // BS (Backspace)
+                // Move back and delete - essential for Telnet tab completion
+                if !current.isEmpty && !current.hasSuffix("\n") {
                     current.removeLast()
                 }
-            case 13:
-                if !current.hasSuffix("\n") {
-                    current.append("\n")
+                i += 1
+            } else if char == "\u{1B}" && i + 1 < chars.count && chars[i+1] == "[" {
+                // ANSI CSI
+                var k = i + 2
+                var found = false
+                while k < chars.count {
+                    let c = chars[k]
+                    if (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || c == "@" {
+                        if c == "K" || c == "J" {
+                            if let lastNL = current.lastIndex(of: "\n") {
+                                current.removeSubrange(current.index(after: lastNL)..<current.endIndex)
+                            } else { current = "" }
+                        } else if c == "D" { // Cursor Left
+                             if !current.isEmpty && !current.hasSuffix("\n") { current.removeLast() }
+                        }
+                        i = k + 1
+                        found = true
+                        break
+                    }
+                    k += 1
                 }
-            default:
-                current.unicodeScalars.append(scalar)
+                if !found { current.append(char); i += 1 }
+            } else {
+                current.append(char)
+                i += 1
             }
         }
+        
         self.logs = current
         attemptAutoCredentialInjection(latestChunk: newString, currentLog: current)
     }
@@ -255,35 +295,44 @@ class TerminalConnectionManager {
 
     private func filterTelnetCommands(from data: Data) -> Data {
         let bytes = [UInt8](data)
-        var filteredBytes = [UInt8]()
+        var filtered = [UInt8]()
         var i = 0
         while i < bytes.count {
             if bytes[i] == 255 { // IAC
-                 if i + 1 < bytes.count {
-                     let command = bytes[i+1]
-                     if command >= 251 && command <= 254 { // WILL, WONT, DO, DONT
-                         i += 3
-                     } else if command == 250 { // SB (Subnegotiation)
-                         i += 2
-                         while i + 1 < bytes.count && !(bytes[i] == 255 && bytes[i+1] == 240) {
-                             i += 1
-                         }
-                         i += 2 // Skip IAC SE
-                     } else if command == 255 { // Escaped 255
-                         filteredBytes.append(255)
-                         i += 2
-                     } else {
-                         i += 2 // Other simple commands
-                     }
-                 } else {
-                     i += 1
-                 }
+                if i + 1 < bytes.count {
+                    let cmd = bytes[i+1]
+                    if cmd == 253 || cmd == 251 { // DO or WILL
+                        if i + 2 < bytes.count {
+                            let opt = bytes[i+2]
+                            // Respond to DO ECHO or WILL ECHO to prevent double echo
+                            if opt == 1 { 
+                                let response: [UInt8] = (cmd == 253) ? [255, 252, 1] : [255, 254, 1]
+                                sendRaw(Data(response))
+                            }
+                            i += 3
+                        } else { i += 2 }
+                    } else if cmd == 250 { // SB
+                        i += 2
+                        while i + 1 < bytes.count && !(bytes[i] == 255 && bytes[i+1] == 240) { i += 1 }
+                        i += 2
+                    } else if cmd == 255 {
+                        filtered.append(255)
+                        i += 2
+                    } else { i += 2 }
+                } else { i += 1 }
             } else {
-                 filteredBytes.append(bytes[i])
-                 i += 1
+                filtered.append(bytes[i])
+                i += 1
             }
         }
-        return Data(filteredBytes)
+        return Data(filtered)
+    }
+    
+    // Helper for Raw Data sending
+    private func sendRaw(_ data: Data) {
+        if telnetConnection?.state == .ready {
+            telnetConnection?.send(content: data, completion: .contentProcessed({ _ in }))
+        }
     }
 
     private func receiveTelnetData() {

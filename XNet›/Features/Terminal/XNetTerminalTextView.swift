@@ -249,46 +249,65 @@ class CustomTerminalTextView: NSTextView {
     var renderedSource = ""
     var appliedThemeID = TerminalTheme.defaultTheme.id
     
+    override var acceptsFirstResponder: Bool { true }
+    
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        // Do nothing here to prevent double-input. All characters are captured in keyDown.
+    }
+    
+    override func insertTab(_ sender: Any?) {}
+    override func insertNewline(_ sender: Any?) {}
+    override func insertBacktab(_ sender: Any?) {}
+    
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        return false
+    }
+    
     override func keyDown(with event: NSEvent) {
-        // Intercept keys and send them to the delegate instead of putting them into the view natively.
-        // We rely on the server (like SSH or Telnet) to echo characters back to us.
+        let keyCode = event.keyCode
         
-        if let chars = event.characters {
-            let keyCode = event.keyCode
-            
-            // Handle some specific control keys directly
-            switch keyCode {
-            case 36: // Return
-                onInput?("\n")
-            case 48: // Tab
-                onInput?("\t")
-            case 51: // Delete/Backspace
-                // We send the backspace character \u{0008} or \x7F (DEL). Network gear usually likes DEL
-                onInput?("\u{7F}")
-            case 123: // Left Arrow
-                onInput?("\u{1B}[D")
-            case 124: // Right Arrow
-                onInput?("\u{1B}[C")
-            case 125: // Down Arrow
-                onInput?("\u{1B}[B")
-            case 126: // Up Arrow
-                onInput?("\u{1B}[A")
-            default:
-                // If it's a standard character like '?', letters, numbers, etc.
-                if !chars.isEmpty && !event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.control) {
-                    onInput?(chars)
-                } else if event.modifierFlags.contains(.control) && !chars.isEmpty, let firstChar = chars.utf16.first {
-                    if firstChar >= 97 && firstChar <= 122 {
-                        if let scalar = UnicodeScalar(firstChar - 96) {
-                            onInput?(String(scalar))
-                        }
+        // 1. Handle functional keys by their keycodes (most reliable)
+        switch keyCode {
+        case 36: // Return
+            onInput?("\r")
+            return
+        case 48: // Tab
+            onInput?("\t")
+            return
+        case 51: // Delete
+            onInput?("\u{7F}")
+            return
+        case 123: // Left
+            onInput?("\u{1B}[D")
+            return
+        case 124: // Right
+            onInput?("\u{1B}[C")
+            return
+        case 125: // Down
+            onInput?("\u{1B}[B")
+            return
+        case 126: // Up
+            onInput?("\u{1B}[A")
+            return
+        default:
+            break
+        }
+        
+        // 2. Handle alphanumeric and control combinations
+        if let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
+            if event.modifierFlags.contains(.control) {
+                if let first = chars.utf16.first, first >= 97 && first <= 122 {
+                    if let scalar = UnicodeScalar(first - 96) {
+                        onInput?(String(scalar))
+                        return
                     }
                 }
             }
+            
+            if !event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.control) {
+                onInput?(chars)
+            }
         }
-        
-        // Prevent default macOS behavior (we do not call super)
-        // This ensures characters only appear if the remote server echoes them back.
     }
     
     // We want to force the cursor to visually look like it's at the end
