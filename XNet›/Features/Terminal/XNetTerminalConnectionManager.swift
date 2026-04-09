@@ -12,6 +12,7 @@ import Observation
 class TerminalConnectionManager {
     var logs: String = ""
     var isConnected: Bool = false
+    private var shadowInputBuffer: String = ""
     private var shouldClearLineOnNextChar: Bool = false
     
     private var sshProcess: Process?
@@ -203,18 +204,17 @@ class TerminalConnectionManager {
     
     private func processIncomingData(_ newString: String) {
         var current = self.logs
-        let chars = Array(newString)
+        let incomingChars = Array(newString)
         var i = 0
         
-        while i < chars.count {
-            let char = chars[i]
+        while i < incomingChars.count {
+            let char = incomingChars[i]
             
             if char == "\r" {
-                if i + 1 < chars.count && chars[i+1] == "\n" {
+                if i + 1 < incomingChars.count && incomingChars[i+1] == "\n" {
                     current.append("\n")
                     i += 2
                 } else {
-                    // CR: Row reset
                     if let lastNL = current.lastIndex(of: "\n") {
                         current.removeSubrange(current.index(after: lastNL)..<current.endIndex)
                     } else { current = "" }
@@ -223,24 +223,22 @@ class TerminalConnectionManager {
             } else if char == "\n" {
                 current.append("\n")
                 i += 1
-            } else if char == "\u{08}" { // BS (Backspace)
-                // Move back and delete - essential for Telnet tab completion
+            } else if char == "\u{08}" {
                 if !current.isEmpty && !current.hasSuffix("\n") {
                     current.removeLast()
                 }
                 i += 1
-            } else if char == "\u{1B}" && i + 1 < chars.count && chars[i+1] == "[" {
-                // ANSI CSI
+            } else if char == "\u{1B}" && i + 1 < incomingChars.count && incomingChars[i+1] == "[" {
                 var k = i + 2
                 var found = false
-                while k < chars.count {
-                    let c = chars[k]
+                while k < incomingChars.count {
+                    let c = incomingChars[k]
                     if (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || c == "@" {
                         if c == "K" || c == "J" {
                             if let lastNL = current.lastIndex(of: "\n") {
                                 current.removeSubrange(current.index(after: lastNL)..<current.endIndex)
                             } else { current = "" }
-                        } else if c == "D" { // Cursor Left
+                        } else if c == "D" {
                              if !current.isEmpty && !current.hasSuffix("\n") { current.removeLast() }
                         }
                         i = k + 1
@@ -251,8 +249,36 @@ class TerminalConnectionManager {
                 }
                 if !found { current.append(char); i += 1 }
             } else {
-                current.append(char)
-                i += 1
+                // STREAM FUSION LOGIC:
+                // Check if the current line ends with a sequence that matches the start of the remaining incoming string
+                // We check decreasing overlap sizes to find the longest match
+                let currentLine: String
+                if let lastNL = current.lastIndex(of: "\n") {
+                    currentLine = String(current[current.index(after: lastNL)...])
+                } else {
+                    currentLine = current
+                }
+                
+                var merged = false
+                if !currentLine.isEmpty {
+                    let maxOverlap = min(currentLine.count, 10) // Only check last 10 chars for performance
+                    for size in (1...maxOverlap).reversed() {
+                        let suffix = String(currentLine.suffix(size))
+                        let remaining = String(incomingChars[i...])
+                        if remaining.hasPrefix(suffix) {
+                            // Found an overlap (echo or completion start)
+                            // We skip the overlapping part in the incoming stream
+                            i += size
+                            merged = true
+                            break
+                        }
+                    }
+                }
+                
+                if !merged {
+                    current.append(char)
+                    i += 1
+                }
             }
         }
         
@@ -365,6 +391,11 @@ class TerminalConnectionManager {
     }
     
     func sendRaw(_ string: String) {
+        // Track local input for deduplication (only single chars or small snippets)
+        if string.count <= 2 && !string.contains("\r") && !string.contains("\n") {
+            shadowInputBuffer.append(string)
+        }
+        
         if let data = string.data(using: .utf8) {
             if let process = sshProcess, process.isRunning {
                 pipeIn?.fileHandleForWriting.write(data)

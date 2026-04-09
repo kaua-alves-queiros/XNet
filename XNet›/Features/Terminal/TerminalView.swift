@@ -245,6 +245,7 @@ struct TerminalView: View {
                     .background(Color.primary.opacity(0.04))
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 
                 HStack(spacing: 6) {
                     if connectionType == .serial {
