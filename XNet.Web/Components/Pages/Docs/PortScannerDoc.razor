@@ -1,0 +1,65 @@
+@page "/documentation/port-scanner"
+
+<PageTitle>Port Scanner Docs - XNet›</PageTitle>
+
+<header class="apple-nav">
+    <div class="nav-container">
+        <a href="/#overview" class="nav-logo">
+            <img src="assets/logo.png" width="32" height="32" alt="logo" />
+            XNet›
+        </a>
+        <div class="nav-links">
+            <a href="/documentation">Back to Docs</a>
+            <a href="/downloads" class="apple-btn-blue text-white">Download <i class="bi bi-chevron-right ms-1 small"></i></a>
+        </div>
+    </div>
+</header>
+
+<main class="container-apple py-5 mt-5">
+    <div class="doc-wrapper">
+        <DocSidebar />
+        
+        <div class="doc-main-content animate-fade">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/documentation" class="link-blue" style="font-size: 14px;">Documentation</a></li>
+                    <li class="breadcrumb-item active text-muted" style="font-size: 14px;" aria-current="page">Port Scanner</li>
+                </ol>
+            </nav>
+
+            <h1 class="display-4 fw-bold text-white mb-4">Port Scanner</h1>
+            <p class="hero-description mb-5">Identify active services and audit device security with rapid sequencing.</p>
+
+            <!-- Visual Preview -->
+            <div class="glass-card overflow-hidden mb-5">
+                <img src="assets/screenshots/port.png" class="img-fluid" alt="Port Scanner Interface" />
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Service Auditing</h2>
+                <p class="text-sf-secondary">The Port Scanner allows for targeted auditing of specific IP addresses. By checking common (or custom) TCP/UDP ports, you can quickly determine which services are exposed to the network.</p>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Port Range Rules</h2>
+                <p class="text-sf-secondary mb-3">Define the scope of your audit using flexible port selection logic:</p>
+                <div class="bg-dark p-3 rounded mb-4" style="background: rgba(0,0,0,0.3) !important;">
+                    <ul class="text-sf-secondary list-unstyled m-0" style="font-family: 'SF Mono', monospace; font-size: 14px;">
+                        <li class="mb-2"><span class="text-primary">80, 443, 8080</span> — <span class="text-muted">Comma-separated list (Targeted)</span></li>
+                        <li class="mb-2"><span class="text-primary">1-1024</span> — <span class="text-muted">Range Notation (Well-known ports)</span></li>
+                        <li><span class="text-primary">22</span> — <span class="text-muted">Single service check</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Security Focus</h2>
+                <ul class="text-sf-secondary">
+                    <li class="mb-2"><strong>Custom Ranges</strong>: Scan specific ports or entire blocks (1-65535).</li>
+                    <li class="mb-2"><strong>Service ID</strong>: Logic that helps identify standard services like HTTP, SSH, Telnet, and SNMP.</li>
+                    <li class="mb-2"><strong>Timeout Logic</strong>: Precision timeout handling to prevent skewed results during high-latency scans.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</main>

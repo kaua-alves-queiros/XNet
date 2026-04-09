@@ -1,0 +1,80 @@
+@page "/documentation/ip-scanner"
+
+<PageTitle>IP Scanner Docs - XNet›</PageTitle>
+
+<header class="apple-nav">
+    <div class="nav-container">
+        <a href="/#overview" class="nav-logo">
+            <img src="assets/logo.png" width="32" height="32" alt="logo" />
+            XNet›
+        </a>
+        <div class="nav-links">
+            <a href="/documentation">Back to Docs</a>
+            <a href="/downloads" class="apple-btn-blue text-white">Download <i class="bi bi-chevron-right ms-1 small"></i></a>
+        </div>
+    </div>
+</header>
+
+<main class="container-apple py-5 mt-5">
+    <div class="doc-wrapper">
+        <DocSidebar />
+        
+        <div class="doc-main-content animate-fade">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/documentation" class="link-blue" style="font-size: 14px;">Documentation</a></li>
+                    <li class="breadcrumb-item active text-muted" style="font-size: 14px;" aria-current="page">IP Scanner</li>
+                </ol>
+            </nav>
+
+            <h1 class="display-4 fw-bold text-white mb-4">IP Scanner</h1>
+            <p class="hero-description mb-5">High-speed network discovery and vendor identification made native.</p>
+
+            <!-- Visual Preview -->
+            <div class="glass-card overflow-hidden mb-5">
+                <img src="assets/screenshots/ip_scan.png" class="img-fluid" alt="IP Scanner Interface" />
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Overview</h2>
+                <p class="text-sf-secondary">The XNet IP Scanner is designed for rapid reconnaissance of local and remote subnets. Built on top of raw ICMP sockets, it allows network engineers to map infrastructure, identify connected devices, and detect common vendor types in seconds.</p>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Input Formats & Rules</h2>
+                <p class="text-sf-secondary mb-3">To ensure high performance and accuracy, XNet supports the following network address formats:</p>
+                <div class="bg-dark p-3 rounded mb-4" style="background: rgba(0,0,0,0.3) !important;">
+                    <ul class="text-sf-secondary list-unstyled m-0" style="font-family: 'SF Mono', monospace; font-size: 14px;">
+                        <li class="mb-2"><span class="text-primary">192.168.1.0/24</span> — <span class="text-muted">CIDR Notation (Single Subnet)</span></li>
+                        <li class="mb-2"><span class="text-primary">10.0.0.1-10.0.0.50</span> — <span class="text-muted">Implicit Range (Start - End)</span></li>
+                        <li><span class="text-primary">172.16.0.1</span> — <span class="text-muted">Single Host Probing</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Key Features</h2>
+                <ul class="text-sf-secondary">
+                    <li class="mb-2"><strong>Vendor Detection</strong>: Automatic MAC-Address vendor resolution for quick infrastructure mapping.</li>
+                    <li class="mb-2"><strong>Parallel Probing</strong>: Asynchronous scanning engine that handles thousands of requests without blocking the UI.</li>
+                    <li class="mb-2"><strong>Real-time Visualization</strong>: Live updates as devices are discovered on the network.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card p-4 mt-5">
+                <h4 class="h6 fw-bold text-white mb-2"><i class="bi bi-info-circle me-2"></i> Pro Tip</h4>
+                <p class="small text-sf-secondary m-0">You can export the results of your scan directly to your NetBox inventory for persistent tracking.</p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<style>
+    .doc-section p, .doc-section li {
+        font-size: 17px;
+        line-height: 1.6;
+    }
+    .breadcrumb-item + .breadcrumb-item::before {
+        color: var(--apple-text-secondary);
+    }
+</style>
