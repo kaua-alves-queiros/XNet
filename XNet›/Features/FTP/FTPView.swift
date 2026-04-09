@@ -1,8 +1,3 @@
-//
-//  FTPView.swift
-//  XNet›
-//
-
 import SwiftUI
 import UniformTypeIdentifiers
 import SwiftData
@@ -30,7 +25,6 @@ struct FTPView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerSection
-            Divider()
             
             GeometryReader { geo in
                 HStack(spacing: 0) {
@@ -38,28 +32,20 @@ struct FTPView: View {
                         .frame(width: 320)
                     
                     Divider()
+                        .background(selectedTheme.panelBorderColor.opacity(0.3))
                     
                     HStack(spacing: 0) {
-                        LocalFileBrowser(manager: connectionManager)
+                        LocalFileBrowser(manager: connectionManager, theme: selectedTheme)
                             .frame(width: (geo.size.width - 320) / 2)
                         
                         Divider()
+                            .background(selectedTheme.panelBorderColor.opacity(0.3))
                         
-                        RemoteFileBrowser(manager: connectionManager)
+                        RemoteFileBrowser(manager: connectionManager, theme: selectedTheme)
                             .frame(width: (geo.size.width - 320) / 2)
                     }
                 }
             }
-            .background(
-                LinearGradient(
-                    colors: [
-                        selectedTheme.chromeTopColor.opacity(selectedTheme.isLight ? 0.95 : 0.72),
-                        selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.03 : 0.06)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
         }
         .background(
             LinearGradient(
@@ -96,7 +82,7 @@ struct FTPView: View {
                         .foregroundStyle(selectedTheme.foregroundColor)
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(connectionManager.isConnected ? Color.green : Color.secondary.opacity(0.5))
+                            .fill(connectionManager.isConnected ? Color.green : selectedTheme.mutedColor.opacity(0.5))
                             .frame(width: 8, height: 8)
                         Text(connectionManager.isConnected ? "Sessão ativa em \(transferProtocol.rawValue.uppercased()) • \(host)" : "Clique em um dispositivo e conecte automaticamente")
                             .font(.subheadline)
@@ -135,18 +121,22 @@ struct FTPView: View {
                 connectionField(icon: "server.rack", title: "Host", width: 200) {
                     TextField("Host", text: $host)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(selectedTheme.foregroundColor)
                 }
                 connectionField(icon: "number", title: "Porta", width: 80) {
                     TextField("Port", text: $port)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(selectedTheme.foregroundColor)
                 }
                 connectionField(icon: "person.fill", title: "Usuário", width: 140) {
                     TextField("User", text: $username)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(selectedTheme.foregroundColor)
                 }
                 connectionField(icon: "key.fill", title: "Senha", width: 150) {
                     SecureField("Pass", text: $password)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(selectedTheme.foregroundColor)
                 }
                 
                 Spacer(minLength: 0)
@@ -174,14 +164,8 @@ struct FTPView: View {
         }
         .padding(.horizontal, 28)
         .padding(.top, 28)
-        .padding(.bottom, 18)
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.chromeTopColor, selectedTheme.chromeBottomColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .padding(.bottom, 24)
+        .background(selectedTheme.chromeTopColor.opacity(0.3))
     }
     
     private var deviceSidebar: some View {
@@ -201,7 +185,7 @@ struct FTPView: View {
                     .foregroundStyle(selectedTheme.mutedColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.64))
+                    .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.5))
                     .clipShape(Capsule())
             }
             .padding(.horizontal, 14)
@@ -212,13 +196,13 @@ struct FTPView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(selectedTheme.mutedColor)
-                TextField("Buscar host, IP ou grupo", text: $deviceSearch)
+                TextField("Buscar...", text: $deviceSearch)
                     .textFieldStyle(.plain)
                     .foregroundStyle(selectedTheme.foregroundColor)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.58))
+            .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.92 : 0.4))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 14)
             
@@ -271,13 +255,7 @@ struct FTPView: View {
                 .padding(.bottom, 14)
             }
         }
-        .background(
-            LinearGradient(
-                colors: [selectedTheme.sidebarTopColor, selectedTheme.sidebarBottomColor],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(selectedTheme.sidebarTopColor.opacity(0.2))
     }
     
     private func connectionField<Content: View>(icon: String, title: String, width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
@@ -286,16 +264,15 @@ struct FTPView: View {
                 .font(.caption)
                 .foregroundStyle(selectedTheme.mutedColor)
             content()
-                .foregroundStyle(selectedTheme.foregroundColor)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(width: width, alignment: .leading)
-        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.7))
+        .background(selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.94 : 0.6))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.35 : 0.45), lineWidth: 1)
+                .stroke(selectedTheme.panelBorderColor.opacity(0.35), lineWidth: 1)
         )
     }
     
@@ -323,9 +300,6 @@ struct FTPView: View {
                             .font(.system(size: 10))
                             .foregroundStyle(selectedTheme.mutedColor)
                             .lineLimit(1)
-                        Text("Preferido: \(preferredProtocol(for: device).rawValue.uppercased())")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(selectedTheme.accentColor)
                     }
                     
                     Spacer()
@@ -345,11 +319,11 @@ struct FTPView: View {
             }
         }
         .padding(12)
-        .background(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(selectedTheme.isLight ? 0.14 : 0.18) : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.42))
+        .background(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(0.12) : selectedTheme.cardBackgroundColor.opacity(selectedTheme.isLight ? 0.9 : 0.4))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(0.38) : selectedTheme.panelBorderColor.opacity(selectedTheme.isLight ? 0.32 : 0.45), lineWidth: 1)
+                .stroke(selectedCredentialID == device.credentialID ? selectedTheme.accentColor.opacity(0.4) : selectedTheme.panelBorderColor.opacity(0.3), lineWidth: 1)
         )
     }
     
@@ -362,7 +336,7 @@ struct FTPView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(tint.opacity(0.9))
+        .tint(tint.opacity(0.6))
         .controlSize(.mini)
     }
     
@@ -574,6 +548,7 @@ private struct TransferDeviceCacheEntry: Decodable {
 
 struct LocalFileBrowser: View {
     @Bindable var manager: FTPConnectionManager
+    var theme: TerminalTheme
     @State private var currentPath: String = NSHomeDirectory()
     @State private var files: [FileItem] = []
     @State private var searchText: String = ""
@@ -584,10 +559,11 @@ struct LocalFileBrowser: View {
             // Path Bar
             HStack(spacing: 8) {
                 Image(systemName: "folder.badge.gearshape")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(theme.accentColor)
                 TextField("Path", text: $currentPath)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(theme.foregroundColor)
                     .onSubmit { loadFiles() }
                 
                 Button(action: {
@@ -599,27 +575,30 @@ struct LocalFileBrowser: View {
                         .font(.system(size: 11, weight: .bold))
                 }
                 .buttonStyle(.plain)
+                .foregroundStyle(theme.mutedColor)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.04))
+            .background(theme.cardBackgroundColor.opacity(0.4))
             .cornerRadius(8)
             .padding(12)
             
             Divider()
+                .background(theme.panelBorderColor.opacity(0.2))
             
             // Filter & Sort
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal.decrease.circle")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.mutedColor)
                         .font(.system(size: 12))
                     TextField("Filter...", text: $searchText)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(theme.foregroundColor)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.03))
+                .background(theme.cardBackgroundColor.opacity(0.3))
                 .cornerRadius(6)
                 
                 Picker("", selection: $sortOption) {
@@ -632,15 +611,16 @@ struct LocalFileBrowser: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(NSColor.windowBackgroundColor))
+            .background(theme.chromeTopColor.opacity(0.1))
             
             Divider()
+                .background(theme.panelBorderColor.opacity(0.2))
             
             let filteredFiles = searchText.isEmpty ? files : files.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
             let sortedFiles = filteredFiles.sorted {
                 if $0.isDirectory != $1.isDirectory { return $0.isDirectory && !$1.isDirectory }
                 if sortOption == .date {
-                    return $0.date > $1.date // Newest first
+                    return $0.date > $1.date
                 } else {
                     return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
                 }
@@ -649,18 +629,19 @@ struct LocalFileBrowser: View {
                 ForEach(sortedFiles) { file in
                     HStack {
                         Image(systemName: file.isDirectory ? "folder.fill" : "doc")
-                            .foregroundColor(file.isDirectory ? .blue : .secondary)
+                            .foregroundColor(file.isDirectory ? theme.accentColor : theme.mutedColor)
                         Text(file.name)
+                            .foregroundStyle(theme.foregroundColor)
                         Spacer()
                         if !file.isDirectory {
                             Text(formatBytes(file.size))
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(theme.mutedColor)
                         }
                         if file.date != Date.distantPast {
                             Text(formatDate(file.date))
                                 .font(.caption)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(theme.mutedColor.opacity(0.6))
                         }
                     }
                     .contentShape(Rectangle())
@@ -670,7 +651,6 @@ struct LocalFileBrowser: View {
                             loadFiles()
                         }
                     }
-                    // Implement Drag out (Upload)
                     .onDrag {
                         let provider = NSItemProvider(object: file.path as NSString)
                         provider.suggestedName = "UPLOAD:\(file.path)"
@@ -678,18 +658,7 @@ struct LocalFileBrowser: View {
                     }
                 }
             }
-            .onDrop(of: [.plainText], isTargeted: nil) { providers in
-                // Accept drop from right side (Download)
-                providers.first?.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { (item, error) in
-                    if let stringData = item as? Data, let path = String(data: stringData, encoding: .utf8), path.starts(with: "DOWNLOAD:") {
-                        let remotePath = String(path.dropFirst(9))
-                        DispatchQueue.main.async {
-                            manager.downloadFile(remotePath: remotePath, localFolder: currentPath)
-                        }
-                    }
-                }
-                return true
-            }
+            .scrollContentBackground(.hidden)
         }
         .onAppear { loadFiles() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LocalBrowserRefresh"))) { _ in
@@ -702,9 +671,8 @@ struct LocalFileBrowser: View {
         do {
             let contents = try fm.contentsOfDirectory(atPath: currentPath)
             var items: [FileItem] = []
-            
             for item in contents {
-                if item.hasPrefix(".") { continue } // simple skip hidden
+                if item.hasPrefix(".") { continue }
                 let fullPath = (currentPath as NSString).appendingPathComponent(item)
                 var isDir: ObjCBool = false
                 if fm.fileExists(atPath: fullPath, isDirectory: &isDir) {
@@ -714,8 +682,6 @@ struct LocalFileBrowser: View {
                     items.append(FileItem(name: item, isDirectory: isDir.boolValue, size: size, path: fullPath, date: date))
                 }
             }
-            
-            // Sort dirs first
             files = items.sorted {
                 if $0.isDirectory == $1.isDirectory { return $0.name.lowercased() < $1.name.lowercased() }
                 return $0.isDirectory && !$1.isDirectory
@@ -727,15 +693,13 @@ struct LocalFileBrowser: View {
     
     private func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
+        formatter.allowedUnits = [.useAll]; formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
+        formatter.dateStyle = .short; formatter.timeStyle = .short
         return formatter.string(from: date)
     }
 }
@@ -744,6 +708,7 @@ struct LocalFileBrowser: View {
 
 struct RemoteFileBrowser: View {
     @Bindable var manager: FTPConnectionManager
+    var theme: TerminalTheme
     @State private var searchText: String = ""
     @State private var sortOption: SortOption = .name
     
@@ -752,10 +717,11 @@ struct RemoteFileBrowser: View {
             // Path Bar
             HStack(spacing: 8) {
                 Image(systemName: "network")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(theme.accentColor)
                 TextField("Remote Path", text: $manager.remoteCurrentPath)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(theme.foregroundColor)
                     .onSubmit { manager.loadRemoteFiles() }
                     .disabled(!manager.isConnected)
                 
@@ -772,29 +738,32 @@ struct RemoteFileBrowser: View {
                         .font(.system(size: 11, weight: .bold))
                 }
                 .buttonStyle(.plain)
+                .foregroundStyle(theme.mutedColor)
                 .disabled(!manager.isConnected)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.04))
+            .background(theme.cardBackgroundColor.opacity(0.4))
             .cornerRadius(8)
             .padding(12)
             
             Divider()
+                .background(theme.panelBorderColor.opacity(0.2))
             
             // Filter & Sort
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal.decrease.circle")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.mutedColor)
                         .font(.system(size: 12))
                     TextField("Filter...", text: $searchText)
                         .textFieldStyle(.plain)
+                        .foregroundStyle(theme.foregroundColor)
                         .disabled(!manager.isConnected)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.03))
+                .background(theme.cardBackgroundColor.opacity(0.3))
                 .cornerRadius(6)
                 
                 Picker("", selection: $sortOption) {
@@ -808,15 +777,24 @@ struct RemoteFileBrowser: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(NSColor.windowBackgroundColor))
+            .background(theme.chromeTopColor.opacity(0.1))
             
             Divider()
+                .background(theme.panelBorderColor.opacity(0.2))
             
             if !manager.isConnected {
                 VStack {
                     Spacer()
-                    Text("Not Connected")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "wifi.slash")
+                        .font(.system(size: 40))
+                        .foregroundStyle(theme.mutedColor.opacity(0.2))
+                        .padding(.bottom, 12)
+                    Text("Não Conectado")
+                        .font(.headline)
+                        .foregroundColor(theme.mutedColor.opacity(0.5))
+                    Text("Selecione um host no painel lateral")
+                        .font(.caption)
+                        .foregroundColor(theme.mutedColor.opacity(0.4))
                     Spacer()
                 }
             } else {
@@ -833,18 +811,19 @@ struct RemoteFileBrowser: View {
                     ForEach(sortedFiles) { file in
                         HStack {
                             Image(systemName: file.isDirectory ? "folder.fill" : "doc")
-                                .foregroundColor(file.isDirectory ? .blue : .secondary)
+                                .foregroundColor(file.isDirectory ? theme.accentColor : theme.mutedColor)
                             Text(file.name)
+                                .foregroundStyle(theme.foregroundColor)
                             Spacer()
                             if !file.isDirectory {
                                 Text(formatBytes(file.size))
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(theme.mutedColor)
                             }
                             if file.date != Date.distantPast {
                                 Text(formatDate(file.date))
                                     .font(.caption)
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(theme.mutedColor.opacity(0.6))
                             }
                         }
                         .contentShape(Rectangle())
@@ -854,7 +833,6 @@ struct RemoteFileBrowser: View {
                                 manager.loadRemoteFiles()
                             }
                         }
-                        // Implement Drag out (Download)
                         .onDrag {
                             let dragData = "DOWNLOAD:\(file.path)".data(using: .utf8)!
                             let provider = NSItemProvider(item: dragData as NSData, typeIdentifier: UTType.plainText.identifier)
@@ -862,44 +840,24 @@ struct RemoteFileBrowser: View {
                         }
                     }
                 }
-                .onDrop(of: [.plainText], isTargeted: nil) { providers in
-                    // Accept drop from left side (Upload)
-                    providers.first?.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { (item, error) in
-                        // It might come as a string or data or URL
-                        if let str = item as? String, str.starts(with: "UPLOAD:") {
-                            let localPath = String(str.dropFirst(7))
-                            DispatchQueue.main.async {
-                                manager.uploadFile(localPath: localPath, remoteFolder: manager.remoteCurrentPath)
-                            }
-                        } else if let data = item as? Data, let str = String(data: data, encoding: .utf8), str.starts(with: "UPLOAD:") {
-                            let localPath = String(str.dropFirst(7))
-                            DispatchQueue.main.async {
-                                manager.uploadFile(localPath: localPath, remoteFolder: manager.remoteCurrentPath)
-                            }
-                        }
-                    }
-                    return true
-                }
+                .scrollContentBackground(.hidden)
             }
         }
     }
     
     private func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useAll]
-        formatter.countStyle = .file
+        formatter.allowedUnits = [.useAll]; formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
+        formatter.dateStyle = .short; formatter.timeStyle = .short
         return formatter.string(from: date)
     }
 }
 
-// Helper for double click on macOS lists (Requires custom modifier since List row actions are tricky in SwiftUI macOS)
 extension View {
     func onItemDoubleClick(action: @escaping () -> Void) -> some View {
         self.onTapGesture(count: 2, perform: action)
@@ -908,7 +866,6 @@ extension View {
 
 private enum FTPPasswordStore {
     private static let keyPrefix = "br.com.myrouter.xnet.terminal.password."
-    
     static func readPassword(credentialID: String) -> String? {
         UserDefaults.standard.string(forKey: keyPrefix + credentialID)
     }
