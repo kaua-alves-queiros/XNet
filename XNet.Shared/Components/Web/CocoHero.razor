@@ -1,0 +1,51 @@
+@namespace XNet.Shared.Components.Web
+@using XNet.Shared.Components.CocoUi
+
+<section class="xnet-hero animate-fade-in">
+    <div class="hero-icon-container">
+        <img src="assets/logo.png" alt="XNet Icon" class="hero-icon" />
+        <div class="hero-icon-glow"></div>
+    </div>
+    
+    <CocoHeading Level="1" Class="hero-title">@Title</CocoHeading>
+    <p class="hero-description">@Description</p>
+    
+    <div class="hero-actions">
+        <CocoButton Class="px-5 py-3 fs-5" OnClick='() => Nav.NavigateTo("/downloads")'>
+            Download XNet
+        </CocoButton>
+        <a href="https://github.com/kaua-alves-queiros/XNet" target="_blank" class="coco-nav-link-alt">
+            View on GitHub <i class="bi bi-chevron-right ms-1"></i>
+        </a>
+    </div>
+</section>
+
+@inject NavigationManager Nav
+
+<style>
+    .xnet-hero { text-align: center; padding: 100px 24px 80px; max-width: 900px; margin: 0 auto; position: relative; }
+    
+    .hero-icon-container { position: relative; display: inline-block; margin-bottom: 32px; }
+    .hero-icon { width: 128px; height: 128px; border-radius: 30px; position: relative; z-index: 2; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    .hero-icon-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 140px; height: 140px; background: var(--coco-blue); filter: blur(40px); opacity: 0.3; z-index: 1; }
+
+    .hero-title { 
+        font-size: clamp(60px, 10vw, 96px) !important; 
+        background: linear-gradient(180deg, #fff 40%, rgba(255,255,255,0.6) 100%); 
+        -webkit-background-clip: text; 
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 24px !important;
+    }
+    
+    .hero-description { font-size: 26px; color: var(--coco-text-secondary); line-height: 1.3; margin-bottom: 48px; font-weight: 500; letter-spacing: -0.01em; }
+    
+    .hero-actions { display: flex; align-items: center; justify-content: center; gap: 32px; }
+    
+    .coco-nav-link-alt { color: var(--coco-blue) !important; font-size: 18px; font-weight: 600; transition: opacity 0.2s; }
+    .coco-nav-link-alt:hover { opacity: 0.8; }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "XNet›";
+    [Parameter] public string Description { get; set; } = "Professional Network Intelligence suite.";
+}

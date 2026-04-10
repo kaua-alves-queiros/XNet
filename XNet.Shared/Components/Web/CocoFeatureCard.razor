@@ -1,4 +1,5 @@
 @namespace XNet.Shared.Components.Web
+@using XNet.Shared.Components.CocoUi
 
 <div class="xnet-feature-card-wrapper h-100">
     <div class="xnet-card capability-card">
@@ -6,10 +7,10 @@
         
         <div class="card-body-premium">
             <div class="badge-row mb-3">
-                <span class="xnet-badge-premium" style="background: @BadgeBg; color: @BadgeColor;">@Category</span>
+                <CocoBadge Status="@GetBadgeStatus()">@Category</CocoBadge>
             </div>
             
-            <h3 class="feature-title">@Title</h3>
+            <CocoHeading Level="2" Class="feature-title">@Title</CocoHeading>
             <p class="feature-desc">@Description</p>
         </div>
 
@@ -125,4 +126,11 @@
     [Parameter] public string Category { get; set; } = "";
     [Parameter] public string BadgeBg { get; set; } = "rgba(0,113,227,0.1)";
     [Parameter] public string BadgeColor { get; set; } = "#0071e3";
+
+    private CocoBadge.CocoStatus GetBadgeStatus() {
+        if (BadgeColor.Contains("ff9f0a")) return CocoBadge.CocoStatus.Warning;
+        if (BadgeColor.Contains("ff453a")) return CocoBadge.CocoStatus.Danger;
+        if (BadgeColor.Contains("30d158")) return CocoBadge.CocoStatus.Success;
+        return CocoBadge.CocoStatus.Info;
+    }
 }

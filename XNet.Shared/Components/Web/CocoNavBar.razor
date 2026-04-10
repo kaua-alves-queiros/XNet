@@ -1,0 +1,57 @@
+@namespace XNet.Shared.Components.Web
+@using XNet.Shared.Components.CocoUi
+
+<header class="coco-nav animate-fade-in">
+    <div class="coco-nav-container">
+        <a href="/" class="coco-nav-logo">
+            <img src="assets/logo.png" width="28" height="28" alt="XNet Logo" class="nav-icon" />
+            <span class="brand-text">XNet›</span>
+        </a>
+        
+        <nav class="coco-nav-links">
+            <a href="/#capabilities">Capabilities</a>
+            <a href="/documentation">Docs</a>
+            <a href="https://github.com/kaua-alves-queiros/XNet" target="_blank">GitHub</a>
+            <div class="nav-divider"></div>
+            <a href="/downloads">
+                <CocoButton Class="py-1 px-3" Style="font-size: 13px;">Download</CocoButton>
+            </a>
+        </nav>
+    </div>
+</header>
+
+<style>
+    .coco-nav {
+        position: fixed; top: 12px; left: 0; right: 0; z-index: 2000;
+        display: flex; justify-content: center;
+    }
+
+    .coco-nav-container {
+        width: calc(100% - 40px); max-width: 1000px;
+        background: rgba(20, 20, 22, 0.6); 
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 10px 24px;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .coco-nav-logo { display: flex; align-items: center; gap: 10px; color: #fff !important; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
+    .nav-icon { border-radius: 6px; }
+
+    .coco-nav-links { display: flex; align-items: center; gap: 24px; }
+    .coco-nav-links a { 
+        color: var(--coco-text-secondary) !important; 
+        font-size: 13px; font-weight: 500; 
+        transition: color 0.2s; 
+    }
+    .coco-nav-links a:hover { color: #fff !important; }
+
+    .nav-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+
+    @@media (max-width: 600px) {
+        .coco-nav-links a:not(:last-child), .nav-divider { display: none; }
+    }
+</style>
