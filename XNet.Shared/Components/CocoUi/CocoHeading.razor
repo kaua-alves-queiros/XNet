@@ -1,0 +1,23 @@
+@namespace XNet.Shared.Components.CocoUi
+
+@switch (Level)
+{
+    case 1:
+        <h1 class="coco-h coco-heading-l @Class">@ChildContent</h1>
+        break;
+    case 2:
+        <h2 class="coco-h coco-heading-m @Class">@ChildContent</h2>
+        break;
+    case 3:
+        <h3 class="coco-h coco-heading-s @Class">@ChildContent</h3>
+        break;
+    default:
+        <h4 class="coco-h coco-heading-s @Class">@ChildContent</h4>
+        break;
+}
+
+@code {
+    [Parameter] public int Level { get; set; } = 1;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+}

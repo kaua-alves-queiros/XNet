@@ -1,0 +1,36 @@
+@namespace XNet.Shared.Components.CocoUi
+
+<div class="coco-page-wrapper @Class">
+    <div class="coco-page-container @(Fluid ? "fluid" : "")">
+        @ChildContent
+    </div>
+</div>
+
+<style>
+    .coco-page-wrapper {
+        min-height: 100vh;
+        background: #000;
+        color: #fff;
+        padding: 60px 0;
+    }
+    
+    .coco-page-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 40px;
+    }
+    
+    .coco-page-container.fluid {
+        max-width: 100%;
+    }
+    
+    @@media (max-width: 768px) {
+        .coco-page-container { padding: 0 24px; }
+    }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool Fluid { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+}

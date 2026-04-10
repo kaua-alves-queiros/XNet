@@ -1,0 +1,178 @@
+/* 
+   CocoUI Framework 1.0 - The Official XNet Design System
+   Inspired by macOS Sonoma/Sequoia Aesthetics
+*/
+
+:root {
+    /* Base Palette */
+    --coco-bg: #000000;
+    --coco-card-bg: rgba(28, 28, 30, 0.5);
+    --coco-card-border: rgba(255, 255, 255, 0.08);
+    --coco-glass-blur: 40px;
+    
+    /* Accents */
+    --coco-blue: #007aff;
+    --coco-blue-hover: #0071e3;
+    --coco-green: #32d74b;
+    --coco-red: #ff453a;
+    --coco-orange: #ff9f0a;
+    --coco-purple: #bf5af2;
+    
+    /* Typography */
+    --coco-text-main: #ffffff;
+    --coco-text-secondary: #8e8e93;
+    --coco-text-tertiary: #6e6e73;
+    --coco-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+/* Global Reset */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--coco-bg) !important;
+    font-family: var(--coco-font);
+    color: var(--coco-text-main);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+/* Core Page Layout */
+.coco-page-container {
+    padding: 60px 80px;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
+/* Typography Foundations */
+.coco-h, .coco-h1, .coco-h2, .coco-h3, .coco-h4 { outline: none !important; box-shadow: none !important; }
+.coco-h:focus, .coco-h1:focus, .coco-h2:focus, .coco-h3:focus, .coco-h4:focus { outline: none !important; box-shadow: none !important; }
+
+.coco-h1, .coco-heading-l { font-size: 40px; font-weight: 700; color: #fff; letter-spacing: -0.04em; line-height: 1.1; margin: 0; }
+.coco-h2, .coco-heading-m { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.03em; margin: 0; }
+.coco-h3, .coco-heading-s { font-size: 20px; font-weight: 600; color: #fff; letter-spacing: -0.02em; margin: 0; }
+.coco-h4 { font-size: 16px; font-weight: 600; color: var(--coco-text-secondary); margin: 0; }
+
+/* Global Utilities */
+.coco-breadcrumb { 
+    font-size: 13px; font-weight: 500; color: var(--coco-text-tertiary); 
+    margin-bottom: 24px; display: flex; gap: 8px; 
+}
+.coco-breadcrumb span { opacity: 0.5; }
+.coco-text-small { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--coco-text-tertiary); }
+
+/* Layout Utilities */
+.coco-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+.coco-grid {
+    display: grid;
+    gap: 24px;
+}
+
+/* Glassmorphism Classes */
+.coco-glass {
+    background: var(--coco-card-bg) !important;
+    backdrop-filter: blur(var(--coco-glass-blur)) !important;
+    -webkit-backdrop-filter: blur(var(--coco-glass-blur)) !important;
+    border: 1px solid var(--coco-card-border) !important;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
+}
+
+/* Section Headers */
+.coco-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 48px;
+}
+
+/* Input Overrides */
+select.coco-select {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    appearance: none;
+    outline: none;
+    transition: var(--coco-animate);
+}
+
+select.coco-select:focus {
+    border-color: var(--coco-blue);
+    background: rgba(255,255,255,0.06);
+}
+
+/* Animations */
+.coco-animate {
+    transition: all 0.2s cubic-bezier(0.2, 1, 0.2, 1);
+}
+
+.animate-fade-in {
+    animation: cocoFadeIn 0.8s cubic-bezier(0.2, 1, 0.2, 1);
+}
+
+@keyframes cocoFadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* CocoBadge - High Contrast */
+.coco-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.coco-badge-success { background: rgba(50, 215, 75, 0.15); color: #32d74b; border: 1px solid rgba(50, 215, 75, 0.2); }
+.coco-badge-danger { background: rgba(255, 69, 58, 0.15); color: #ff453a; border: 1px solid rgba(255, 69, 58, 0.2); }
+.coco-badge-warning { background: rgba(255, 159, 10, 0.15); color: #ff9f0a; border: 1px solid rgba(255, 159, 10, 0.2); }
+.coco-badge-info { background: rgba(0, 122, 255, 0.15); color: #0a84ff; border: 1px solid rgba(0, 122, 255, 0.2); }
+
+.coco-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.coco-table th {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--coco-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--coco-card-border);
+}
+
+.coco-table td {
+    padding: 16px 20px;
+    font-size: 14px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.coco-table tr:last-child td { border-bottom: none; }
+
+.coco-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Override Bootstrap Garbage */
+.row { margin: 0 !important; }
+a { color: inherit !important; text-decoration: none !important; transition: opacity 0.2s; }
+a:hover { opacity: 0.7; }

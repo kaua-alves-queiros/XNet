@@ -1,27 +1,20 @@
 @namespace XNet.Shared.Components.CocoUi
 
-<span class="status-badge @GetStatusClass()">
-    <span class="status-dot"></span> @Text
+<span class="coco-badge @GetStatusClass()">
+    @ChildContent
 </span>
 
 @code {
-    [Parameter] public string Text { get; set; } = "Online";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public CocoStatus Status { get; set; } = CocoStatus.Success;
 
     public enum CocoStatus { Success, Warning, Danger, Info }
 
     private string GetStatusClass() => Status switch
     {
-        CocoStatus.Success => "status-success",
-        CocoStatus.Warning => "status-warning",
-        CocoStatus.Danger => "status-danger",
-        _ => "status-info"
+        CocoStatus.Success => "coco-badge-success",
+        CocoStatus.Warning => "coco-badge-warning",
+        CocoStatus.Danger => "coco-badge-danger",
+        _ => "coco-badge-info"
     };
 }
-
-<style>
-    .status-success { background: rgba(50, 215, 75, 0.1); color: #32d74b; border-color: rgba(50, 215, 75, 0.2); }
-    .status-warning { background: rgba(255, 159, 10, 0.1); color: #ff9f0a; border-color: rgba(255, 159, 10, 0.2); }
-    .status-danger { background: rgba(255, 69, 58, 0.1); color: #ff453a; border-color: rgba(255, 69, 58, 0.2); }
-    .status-info { background: rgba(0, 113, 227, 0.1); color: #0071e3; border-color: rgba(0, 113, 227, 0.2); }
-</style>
