@@ -1,0 +1,241 @@
+@page "/Account/Register"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using XNet.SelfHosted.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Register</PageTitle>
+
+<div class="login-wrapper animate-fade">
+    <div class="coco-login-card">
+        <div class="text-center mb-5">
+            <div class="xnet-brand-dot mx-auto mb-4"></div>
+            <h1 class="h2 fw-bold text-white mb-2">Create Account</h1>
+            <p class="text-secondary opacity-75">Join the XNet Self-Hosted ecosystem.</p>
+        </div>
+
+        <section class="mt-4">
+            <StatusMessage Message="@Message" />
+            <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                <DataAnnotationsValidator />
+                
+                <div class="coco-form-group mb-4">
+                    <label class="coco-label">EMAIL ADDRESS</label>
+                    <div class="coco-input-container">
+                        <InputText @bind-Value="Input.Email" class="coco-input" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                    </div>
+                    <ValidationMessage For="() => Input.Email" class="text-danger small mt-2 d-block ms-1" />
+                </div>
+
+                <div class="coco-form-group mb-4">
+                    <label class="coco-label">PASSWORD</label>
+                    <div class="coco-input-container">
+                        <InputText type="password" @bind-Value="Input.Password" class="coco-input" autocomplete="new-password" aria-required="true" placeholder="••••••••" />
+                    </div>
+                    <ValidationMessage For="() => Input.Password" class="text-danger small mt-2 d-block ms-1" />
+                </div>
+
+                <div class="coco-form-group mb-5">
+                    <label class="coco-label">CONFIRM PASSWORD</label>
+                    <div class="coco-input-container">
+                        <InputText type="password" @bind-Value="Input.ConfirmPassword" class="coco-input" autocomplete="new-password" aria-required="true" placeholder="••••••••" />
+                    </div>
+                    <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger small mt-2 d-block ms-1" />
+                </div>
+
+                <button type="submit" class="coco-btn btn-primary w-100 py-3">
+                    Create Account
+                </button>
+                
+                <div class="text-center mt-4">
+                    <a href="Account/Login" class="text-secondary small text-decoration-none hover-white">Already have an account? Login</a>
+                </div>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+<style>
+    .login-wrapper {
+        min-height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: #000;
+    }
+
+    .coco-login-card {
+        max-width: 440px;
+        width: 100%;
+        padding: 50px 45px;
+        background: rgba(30,30,32, 0.4);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 28px;
+        box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    }
+
+    .coco-form-group {
+        width: 100%;
+    }
+
+    .coco-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8e8e93;
+        margin-bottom: 10px;
+        margin-left: 4px;
+    }
+
+    .coco-input-container {
+        position: relative;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.2s cubic-bezier(0.2, 1, 0.2, 1);
+    }
+
+    .coco-input-container:focus-within {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: #007aff;
+        box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15);
+    }
+
+    .coco-input {
+        width: 100%;
+        padding: 14px 18px;
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 16px;
+        outline: none;
+    }
+
+    .coco-input::placeholder {
+        color: rgba(255, 255, 255, 0.2);
+    }
+
+    .xnet-brand-dot {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #00b4ff, #0071e3);
+        border-radius: 12px;
+        box-shadow: 0 10px 20px rgba(0, 113, 227, 0.3);
+    }
+    
+    .hover-white:hover { color: #fff !important; }
+</style>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        var user = CreateUser();
+
+        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
+        {
+            identityErrors = result.Errors;
+            return;
+        }
+
+        Logger.LogInformation("User created a new account with password.");
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        {
+            RedirectManager.RedirectTo(
+                "Account/RegisterConfirmation",
+                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+        }
+        else
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

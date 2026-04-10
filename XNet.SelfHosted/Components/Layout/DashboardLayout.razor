@@ -1,0 +1,85 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+
+<div class="dashboard-container">
+    <XNetSidebar MenuGroups="@menuGroups">
+        <FooterContent>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="user-block xnet-glass">
+                        <div class="user-avatar">
+                            @(context.User.Identity?.Name?[0].ToString().ToUpper() ?? "U")
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">@context.User.Identity?.Name?.Split('@')[0]</div>
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="" />
+                                <button type="submit" class="logout-btn">
+                                    Sign out <i class="bi bi-box-arrow-right"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+        </FooterContent>
+    </XNetSidebar>
+
+    <main class="dashboard-main">
+        <header class="dashboard-header h-nav">
+            <div class="header-breadcrumb">
+                Self-Hosted / @GetCurrentPageName()
+            </div>
+            <div class="header-actions">
+                <div class="status-badge">
+                    <span class="status-dot"></span> Online
+                </div>
+            </div>
+        </header>
+
+        <section class="content-viewport">
+            @Body
+        </section>
+    </main>
+</div>
+
+<style>
+    .dashboard-container { display: flex; min-height: 100vh; }
+    .dashboard-main { flex: 1; display: flex; flex-direction: column; }
+    .content-viewport { padding: 40px; margin: 0 auto; width: 100%; max-width: 1400px; }
+    
+    .user-block { display: flex; align-items: center; gap: 12px; padding: 12px !important; border-radius: 16px !important; }
+    .user-avatar { width: 34px; height: 34px; background: var(--xnet-accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .user-name { font-size: 14px; font-weight: 600; color: #fff; }
+    .logout-btn { background: none; border: none; color: #6e6e73; font-size: 12px; padding: 0; }
+    .h-nav { height: 52px; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
+</style>
+
+@code {
+    private List<XNetSidebar.MenuGroup> menuGroups = new()
+    {
+        new XNetSidebar.MenuGroup { 
+            Label = "Management", 
+            Items = new() {
+                new XNetSidebar.MenuItem { Text = "Dashboard", Href = "", Icon = "bi-grid-fill", Match = NavLinkMatch.All },
+                new XNetSidebar.MenuItem { Text = "Users", Href = "users", Icon = "bi-people-fill" },
+                new XNetSidebar.MenuItem { Text = "Devices", Href = "devices", Icon = "bi-hdd-network-fill" }
+            }
+        },
+        new XNetSidebar.MenuGroup { 
+            Label = "Account", 
+            Items = new() {
+                new XNetSidebar.MenuItem { Text = "My Profile", Href = "Account/Manage", Icon = "bi-person-circle" }
+            }
+        }
+    };
+
+    private string GetCurrentPageName()
+    {
+        var uri = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+        if (string.IsNullOrEmpty(uri)) return "Dashboard";
+        return char.ToUpper(uri[0]) + uri.Substring(1);
+    }
+}

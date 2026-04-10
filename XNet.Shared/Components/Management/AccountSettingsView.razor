@@ -1,0 +1,122 @@
+@namespace XNet.Shared.Components.Management
+@using Microsoft.AspNetCore.Identity
+@using XNet.Shared.Models
+@using XNet.Shared.Components.CocoUi
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+
+<CocoSettingsLayout Tabs="@tabs" ActiveTab="@activeTab" OnTabChanged="tab => activeTab = tab">
+        @if (activeTab == "profile")
+        {
+            <div class="animate-fade">
+                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Personal Information</h4>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <CocoInput Label="EMAIL ADDRESS" @bind-Value="currentUser.Email" Disabled="true" />
+                    </div>
+                    <div class="col-md-6">
+                        <CocoInput Label="FULL NAME" @bind-Value="currentUser.FullName" Placeholder="John Doe" />
+                    </div>
+                    <div class="col-md-12">
+                        <CocoButton OnClick="SaveProfile" Loading="@isSaving">Save Changes</CocoButton>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (activeTab == "security")
+        {
+            <div class="animate-fade">
+                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Change Password</h4>
+                <div class="row g-4">
+                    <div class="col-md-12">
+                        <CocoInput Type="password" Label="CURRENT PASSWORD" @bind-Value="oldPassword" />
+                    </div>
+                    <div class="col-md-6">
+                        <CocoInput Type="password" Label="NEW PASSWORD" @bind-Value="newPassword" />
+                    </div>
+                    <div class="col-md-6">
+                        <CocoInput Type="password" Label="CONFIRM NEW PASSWORD" @bind-Value="confirmPassword" />
+                    </div>
+                    <div class="col-md-12">
+                        <CocoButton OnClick="ChangePassword" Loading="@isSaving">Update Password</CocoButton>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (activeTab == "2fa")
+        {
+            <div class="animate-fade">
+                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Two-Factor Authentication</h4>
+                <div class="glass-card p-4 border-primary-soft">
+                    <p class="text-secondary small mb-4">Protect your account with an additional layer of security by requiring a code from your authenticator app.</p>
+                    <CocoButton OnClick="@(() => message = "2FA configuration is coming soon in the next update.")">Configure Authenticator App</CocoButton>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="mt-4 p-3 rounded @(isError ? "bg-danger-soft text-danger" : "bg-success-soft text-success") animate-fade small">
+                @message
+            </div>
+        }
+    </CocoSettingsLayout>
+
+@code {
+    [Parameter] public ApplicationUser currentUser { get; set; } = new();
+
+    private string activeTab = "profile";
+    private bool isSaving;
+    private string? message;
+    private bool isError;
+
+    private string oldPassword = "";
+    private string newPassword = "";
+    private string confirmPassword = "";
+
+    private List<CocoSettingsLayout.CocoTabItem> tabs = new()
+    {
+        new CocoSettingsLayout.CocoTabItem { Id = "profile", Label = "Profile", Icon = "bi-person-fill" },
+        new CocoSettingsLayout.CocoTabItem { Id = "security", Label = "Security", Icon = "bi-shield-lock-fill" },
+        new CocoSettingsLayout.CocoTabItem { Id = "2fa", Label = "2FA", Icon = "bi-key-fill" }
+    };
+
+    private async Task SaveProfile()
+    {
+        isSaving = true;
+        var result = await UserManager.UpdateAsync(currentUser);
+        if (result.Succeeded) {
+            message = "Profile updated successfully.";
+            isError = false;
+        } else {
+            message = result.Errors.FirstOrDefault()?.Description;
+            isError = true;
+        }
+        isSaving = false;
+    }
+
+    private async Task ChangePassword()
+    {
+        if (newPassword != confirmPassword) {
+            message = "Passwords do not match.";
+            isError = true;
+            return;
+        }
+        isSaving = true;
+        var result = await UserManager.ChangePasswordAsync(currentUser, oldPassword, newPassword);
+        if (result.Succeeded) {
+            message = "Password changed successfully.";
+            isError = false;
+            oldPassword = newPassword = confirmPassword = "";
+        } else {
+            message = result.Errors.FirstOrDefault()?.Description;
+            isError = true;
+        }
+        isSaving = false;
+    }
+}
+
+<style>
+    .bg-success-soft { background: rgba(50, 215, 75, 0.1); }
+    .bg-danger-soft { background: rgba(255, 69, 58, 0.1); }
+</style>
