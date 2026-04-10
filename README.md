@@ -48,7 +48,7 @@ open XNet›.xcodeproj
 
 ## 👥 Development Team
 
-The infrastructure and innovation behind XNet are driven by these contributors:
+The research and innovation behind XNet are driven by these contributors:
 
 <div align="center">
   <a href="https://github.com/kaua-alves-queiros/XNet/graphs/contributors">
