@@ -5,7 +5,7 @@ using XNet.SelfHosted.Components;
 using XNet.SelfHosted.Components.Account;
 using XNet.SelfHosted.Data;
 using XNet.Shared.Models;
-
+// XNet Professional Console - Initialization
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

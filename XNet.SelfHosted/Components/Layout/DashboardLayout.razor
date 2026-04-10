@@ -3,11 +3,11 @@
 @inject NavigationManager Nav
 
 <div class="dashboard-container">
-    <XNetSidebar MenuGroups="@menuGroups">
+    <CocoSidebar MenuGroups="@menuGroups">
         <FooterContent>
             <AuthorizeView>
                 <Authorized>
-                    <div class="user-block xnet-glass">
+                    <div class="user-block coco-glass">
                         <div class="user-avatar">
                             @(context.User.Identity?.Name?[0].ToString().ToUpper() ?? "U")
                         </div>
@@ -25,21 +25,10 @@
                 </Authorized>
             </AuthorizeView>
         </FooterContent>
-    </XNetSidebar>
+    </CocoSidebar>
 
     <main class="dashboard-main">
-        <header class="dashboard-header h-nav">
-            <div class="header-breadcrumb">
-                Self-Hosted / @GetCurrentPageName()
-            </div>
-            <div class="header-actions">
-                <div class="status-badge">
-                    <span class="status-dot"></span> Online
-                </div>
-            </div>
-        </header>
-
-        <section class="content-viewport">
+        <section class="content-viewport animate-fade-in">
             @Body
         </section>
     </main>
@@ -58,20 +47,20 @@
 </style>
 
 @code {
-    private List<XNetSidebar.MenuGroup> menuGroups = new()
+    private List<CocoSidebar.MenuGroup> menuGroups = new()
     {
-        new XNetSidebar.MenuGroup { 
+        new CocoSidebar.MenuGroup { 
             Label = "Management", 
             Items = new() {
-                new XNetSidebar.MenuItem { Text = "Dashboard", Href = "", Icon = "bi-grid-fill", Match = NavLinkMatch.All },
-                new XNetSidebar.MenuItem { Text = "Users", Href = "users", Icon = "bi-people-fill" },
-                new XNetSidebar.MenuItem { Text = "Devices", Href = "devices", Icon = "bi-hdd-network-fill" }
+                new CocoSidebar.MenuItem { Text = "Dashboard", Href = "", Icon = "bi-grid-fill", Match = NavLinkMatch.All },
+                new CocoSidebar.MenuItem { Text = "Users", Href = "users", Icon = "bi-people-fill" },
+                new CocoSidebar.MenuItem { Text = "Devices", Href = "devices", Icon = "bi-hdd-network-fill" }
             }
         },
-        new XNetSidebar.MenuGroup { 
+        new CocoSidebar.MenuGroup { 
             Label = "Account", 
             Items = new() {
-                new XNetSidebar.MenuItem { Text = "My Profile", Href = "Account/Manage", Icon = "bi-person-circle" }
+                new CocoSidebar.MenuItem { Text = "My Profile", Href = "Account/Manage", Icon = "bi-person-circle" }
             }
         }
     };
