@@ -5,21 +5,6 @@
 
 <PageTitle>Downloads - XNet› Professional</PageTitle>
 
-<!-- Unified Apple Nav -->
-<header class="apple-nav">
-    <div class="nav-container">
-        <a href="/#overview" class="nav-logo">
-            <img src="assets/logo.png" width="32" height="32" alt="logo" />
-            XNet›
-        </a>
-        <div class="nav-links">
-            <a href="/#capabilities">Capabilities</a>
-            <a href="/documentation">Documentation</a>
-            <a href="/documentation/github">GitHub</a>
-        </div>
-    </div>
-</header>
-
 <main class="container-apple main-page">
     <div class="text-center mb-5 animate-fade">
         <h1 class="display-3 fw-bold text-white mb-3">Downloads</h1>
@@ -48,37 +33,46 @@
         <div class="row g-4 justify-content-center">
             @foreach (var release in releases)
             {
-                <div class="col-lg-8">
-                    <div class="glass-card mb-4 animate-fade">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="col-12 col-xl-9">
+                    <div class="download-card mb-5 animate-fade">
+                        <div class="download-header d-flex justify-content-between align-items-start mb-4">
                             <div>
-                                <h2 class="h3 fw-bold text-white mb-1">@release.Name</h2>
-                                <span class="badge @(release.Prerelease ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success") rounded-pill">
-                                    @(release.Prerelease ? "Beta" : "Stable")
-                                </span>
-                                <small class="text-muted ms-2">Released on @release.PublishedAt.ToString("MMM dd, yyyy")</small>
-                            </div>
-                            <div class="text-end">
-                                <a href="@release.HtmlUrl" target="_blank" class="apple-btn-blue">View on GitHub</a>
-                            </div>
-                        </div>
-
-                        <div class="release-body mb-4">
-                             @release.Body
-                        </div>
-
-                        <h4 class="h6 fw-bold mb-3">Assets</h4>
-                        <div class="list-group list-group-flush border-0">
-                            @foreach (var asset in release.Assets)
-                            {
-                                <a href="@asset.DownloadUrl" class="list-group-item bg-transparent text-decoration-none border-0 px-0 d-flex justify-content-between align-items-center mb-2" style="border-radius: 12px; transition: background 0.2s;">
-                                    <span>
-                                        <i class="bi @(asset.Name.EndsWith(".dmg") ? "bi-box-arrow-down" : "bi-file-earmark-zip") me-2 text-primary"></i>
-                                        @asset.Name
+                                <div class="d-flex align-items-center gap-3 mb-1">
+                                    <h2 class="h2 fw-bold text-white mb-0">@release.Name</h2>
+                                    <span class="xnet-status-badge @(release.Prerelease ? "is-beta" : "is-stable")">
+                                        @(release.Prerelease ? "Beta" : "Stable")
                                     </span>
-                                    <span class="text-muted small">@((asset.Size / 1024.0 / 1024.0).ToString("N1")) MB</span>
-                                </a>
-                            }
+                                </div>
+                                <small class="text-secondary">Released @GetRelativeTime(release.PublishedAt)</small>
+                            </div>
+                            <a href="@release.HtmlUrl" target="_blank" class="github-btn">
+                                <i class="bi bi-github"></i> View on GitHub
+                            </a>
+                        </div>
+
+                        <div class="release-content mb-4">
+                             @((MarkupString)FormatMarkdown(release.Body))
+                        </div>
+
+                        <div class="assets-section p-4 rounded-4" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                            <h4 class="h6 fw-bold text-white mb-3 text-uppercase opacity-50" style="letter-spacing: 0.1em;">Assets</h4>
+                            <div class="asset-list">
+                                @foreach (var asset in release.Assets)
+                                {
+                                    <a href="@asset.DownloadUrl" class="asset-item">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="asset-icon">
+                                                <i class="bi @(asset.Name.EndsWith(".dmg") ? "bi-apple" : "bi-box-seam")"></i>
+                                            </div>
+                                            <div class="asset-info">
+                                                <span class="asset-name">@asset.Name</span>
+                                                <span class="asset-size">@((asset.Size / 1024.0 / 1024.0).ToString("N1")) MB</span>
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-download download-arrow"></i>
+                                    </a>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -88,24 +82,107 @@
 </main>
 
 <style>
-    .release-body {
-        white-space: pre-wrap;
-        color: var(--apple-text-secondary) !important;
+    .download-card {
+        background: rgba(28, 28, 30, 0.4);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 28px;
+        padding: 40px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+
+    .xnet-status-badge {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 8px;
+        letter-spacing: 0.05em;
+    }
+    .is-stable { background: rgba(48, 209, 88, 0.15); color: #30d158; border: 1px solid rgba(48, 209, 88, 0.2); }
+    .is-beta { background: rgba(255, 159, 10, 0.15); color: #ff9f0a; border: 1px solid rgba(255, 159, 10, 0.2); }
+
+    .github-btn {
+        background: #fff;
+        color: #000;
+        padding: 8px 16px;
+        border-radius: 100px;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .github-btn:hover { background: #e5e5e5; transform: scale(1.05); color: #000; }
+
+    .release-content {
+        color: #a1a1a6;
+        font-size: 15px;
         line-height: 1.6;
     }
-    .list-group-item {
-        color: var(--apple-text) !important;
+    .release-content b { color: #fff; }
+
+    .asset-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 14px;
+        text-decoration: none;
+        transition: all 0.2s;
+        margin-bottom: 8px;
+        border: 1px solid transparent;
     }
-    .list-group-item:hover {
-        background: rgba(255, 255, 255, 0.05) !important;
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-        color: var(--apple-accent) !important;
+    .asset-item:hover {
+        background: rgba(255,255,255,0.05);
+        border-color: rgba(255,255,255,0.1);
     }
+    .asset-icon {
+        width: 36px;
+        height: 36px;
+        background: rgba(0, 122, 255, 0.1);
+        color: #007aff;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .asset-name { display: block; color: #fff; font-weight: 500; font-size: 14px; }
+    .asset-size { display: block; color: #86868b; font-size: 12px; }
+    .download-arrow { color: #007aff; opacity: 0; transition: opacity 0.2s; }
+    .asset-item:hover .download-arrow { opacity: 1; }
 </style>
 
 @code {
     private List<GitHubRelease>? releases;
+
+    private string FormatMarkdown(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        
+        // Basic Markdown Support
+        var html = text
+            .Replace("**", "<b>")
+            .Replace("</b><b>", "</b>") // Cleanup if double stars
+            .Replace("\r\n", "<br/>")
+            .Replace("\n", "<br/>");
+            
+        // Final Bold closing logic (very basic)
+        int count = 0;
+        var finalHtml = System.Text.RegularExpressions.Regex.Replace(html, "<b>", m => (count++ % 2 == 1) ? "</b>" : "<b>");
+        
+        return finalHtml;
+    }
+
+    private string GetRelativeTime(DateTime date)
+    {
+        var span = DateTime.UtcNow - date.ToUniversalTime();
+        if (span.TotalDays > 30) return date.ToString("MMM dd, yyyy");
+        if (span.TotalDays > 1) return $"{(int)span.TotalDays} days ago";
+        if (span.TotalHours > 1) return $"{(int)span.TotalHours} hours ago";
+        return "recently";
+    }
 
     protected override async Task OnInitializedAsync()
     {
