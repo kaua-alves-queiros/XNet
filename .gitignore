@@ -18,6 +18,11 @@ xcuserdata/
 *.log
 *.txt
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
+xnet-local.db
+xnet-server.db
 !README.md
 
 # Package Manager

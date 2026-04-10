@@ -1,0 +1,128 @@
+@namespace XNet.Shared.Components.Web
+
+<div class="xnet-feature-card-wrapper h-100">
+    <div class="xnet-card capability-card">
+        <div class="card-glass-glow"></div>
+        
+        <div class="card-body-premium">
+            <div class="badge-row mb-3">
+                <span class="xnet-badge-premium" style="background: @BadgeBg; color: @BadgeColor;">@Category</span>
+            </div>
+            
+            <h3 class="feature-title">@Title</h3>
+            <p class="feature-desc">@Description</p>
+        </div>
+
+        <div class="feature-image-section">
+            <div class="image-viewport">
+                <img src="@ImageUrl" class="screen-mockup" alt="@Title" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .xnet-feature-card-wrapper {
+        padding: 40px 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .capability-card {
+        background: transparent;
+        border: none;
+        overflow: visible;
+        width: 100%;
+        display: flex;
+        flex-direction: row; /* Lado a lado */
+        align-items: center;
+        gap: 80px;
+        position: relative;
+    }
+
+    .card-body-premium {
+        flex: 1;
+        text-align: left; /* Alinhado à esquerda */
+        z-index: 2;
+        min-width: 400px;
+    }
+
+    .feature-title {
+        font-size: 56px; /* Título maior */
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.04em;
+        margin-bottom: 24px;
+        line-height: 1;
+    }
+
+    .feature-desc {
+        color: #a1a1a6;
+        font-size: 22px; /* Descrição maior */
+        line-height: 1.4;
+        font-weight: 400;
+        max-width: 450px;
+    }
+
+    .feature-image-section {
+        flex: 1.8; /* Imagem ganha mais espaço */
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .image-viewport {
+        width: 100%;
+        position: relative;
+        overflow: visible;
+    }
+
+    .screen-mockup {
+        width: 100%;
+        height: auto;
+        max-height: 75vh; /* Imagem bem grande agora */
+        object-fit: contain;
+        filter: drop-shadow(0 50px 100px rgba(0,0,0,0.95));
+        border-radius: 16px;
+    }
+
+    .badge-row {
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .xnet-badge-premium {
+        font-size: 12px; 
+        font-weight: 700; 
+        text-transform: uppercase;
+        letter-spacing: 0.15em; 
+        padding: 7px 16px; 
+        border-radius: 100px;
+    }
+
+    @@media (max-width: 1100px) {
+        .capability-card {
+            flex-direction: column;
+            gap: 40px;
+            text-align: center;
+        }
+        .card-body-premium {
+            text-align: center;
+            min-width: 100%;
+        }
+        .badge-row { justify-content: center; }
+        .screen-mockup { max-height: 50vh; }
+    }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string ImageUrl { get; set; } = "";
+    [Parameter] public string Category { get; set; } = "";
+    [Parameter] public string BadgeBg { get; set; } = "rgba(0,113,227,0.1)";
+    [Parameter] public string BadgeColor { get; set; } = "#0071e3";
+}

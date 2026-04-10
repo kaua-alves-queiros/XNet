@@ -206,6 +206,21 @@ a.text-white:hover {
     color: var(--apple-text-secondary);
 }
 
+.glass-card {
+    background: rgba(44, 44, 46, 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--apple-border);
+    border-radius: 20px;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.glass-card .p-4.border-bottom {
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
 /* Documentation Sidebar Layout */
 .doc-wrapper {
     display: flex;

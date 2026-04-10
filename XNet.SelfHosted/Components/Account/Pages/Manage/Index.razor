@@ -1,0 +1,33 @@
+@page "/Account/Manage"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using XNet.Shared.Models
+@using XNet.Shared.Components.Management
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@using XNet.SelfHosted.Components.Account
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+
+@layout DashboardLayout
+
+<PageTitle>Profile Settings - XNet Console</PageTitle>
+
+@if (user is not null)
+{
+    <AccountSettingsView currentUser="@user" />
+}
+
+@code {
+    private ApplicationUser user = default!;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+    }
+}

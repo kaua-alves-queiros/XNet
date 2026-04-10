@@ -29,7 +29,7 @@ class XNetUpdater: ObservableObject {
                 
                 if cleanLatest.compare(cleanCurrent, options: .numeric) == .orderedDescending {
                     self.latestVersion = tagName
-                    self.releaseURL = htmlUrl
+                    self.releaseURL = "https://xnet.cloud.queiros.com.br/downloads"
                     self.releaseNotes = body
                     self.updateAvailable = true
                 }

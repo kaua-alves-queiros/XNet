@@ -1,0 +1,98 @@
+@namespace XNet.Shared.Components.Web
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div class="xnet-reveal-container" @ref="revealRef">
+    <div class="xnet-carousel-wrapper">
+        <div class="xnet-carousel-mask left"></div>
+        <div class="xnet-carousel-mask right"></div>
+        
+        <div class="xnet-carousel-track">
+            @ChildContent
+        </div>
+
+        <div class="carousel-controls d-none d-md-flex">
+            <button class="control-btn prev"><i class="bi bi-chevron-left"></i></button>
+            <button class="control-btn next"><i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .xnet-reveal-container {
+        opacity: 0;
+        transform: translateY(100px) scale(0.95);
+        transition: all 1.2s cubic-bezier(0.2, 1, 0.2, 1);
+        filter: blur(10px);
+    }
+
+    .xnet-reveal-container.revealed {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+
+    .xnet-carousel-wrapper {
+        position: relative;
+        width: 100vw;
+        margin-left: calc(-50vw + 50%);
+        padding: 40px 0;
+    }
+
+    .xnet-carousel-mask {
+        position: absolute; top: 0; bottom: 0; width: 15%; z-index: 10; pointer-events: none;
+    }
+    .xnet-carousel-mask.left { left: 0; background: linear-gradient(to right, #000 0%, transparent 100%); }
+    .xnet-carousel-mask.right { right: 0; background: linear-gradient(to left, #000 0%, transparent 100%); }
+
+    .xnet-carousel-track {
+        display: flex;
+        gap: 30px;
+        padding: 0 calc(50vw - 490px);
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+    }
+    .xnet-carousel-track::-webkit-scrollbar { display: none; }
+
+    .xnet-carousel-track > div {
+        flex: 0 0 540px;
+        scroll-snap-align: center;
+    }
+
+    .carousel-controls {
+        position: absolute; top: 50%; width: 100%; transform: translateY(-50%);
+        justify-content: space-between; padding: 0 40px; z-index: 20; pointer-events: none;
+    }
+    .control-btn {
+        width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff; display: flex; align-items: center; justify-content: center;
+        pointer-events: auto; cursor: pointer; transition: 0.4s;
+    }
+    .control-btn:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.1); }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference revealRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('revealed');
+                        }
+                    });
+                }, { threshold: 0.1 });
+                
+                const targets = document.querySelectorAll('.xnet-reveal-container');
+                targets.forEach(t => observer.observe(t));
+            ");
+        }
+    }
+}

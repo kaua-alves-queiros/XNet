@@ -1,0 +1,126 @@
+@namespace XNet.Shared.Components.Web
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div class="xnet-sticky-trigger" @ref="containerRef" style="height: 500vh;">
+    <div class="xnet-sticky-viewport">
+        <div class="sticky-header-content" id="sticky-header">
+            <h2 class="display-2 fw-bold text-white text-center mb-0">Capabilities</h2>
+            <p class="text-secondary text-center fs-5">Professional-grade networking tools integrated into a seamless macOS experience.</p>
+        </div>
+
+        <div class="xnet-horizontal-track" @ref="trackRef">
+            <div class="track-spacer"></div>
+            @ChildContent
+            <div class="track-spacer"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .xnet-sticky-viewport {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: #000;
+    }
+
+    .sticky-header-content {
+        position: absolute;
+        top: 50%;
+        left: 0; right: 0;
+        z-index: 50;
+        text-align: center;
+        transform: translateY(-50%);
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+    .xnet-horizontal-track {
+        display: flex;
+        gap: 200px;
+        will-change: transform;
+        padding: 0 15vw;
+        align-items: center;
+        z-index: 10;
+        height: 100%;
+    }
+
+    .track-spacer { flex: 0 0 50vw; }
+
+    .xnet-horizontal-track > div:not(.track-spacer) {
+        flex: 0 0 1400px; /* Largura aumentada para layout horizontal */
+        transition: transform 0.1s linear, opacity 0.3s;
+        padding: 40px 0;
+    }
+
+    @@media (max-width: 768px) {
+        .xnet-horizontal-track > div:not(.track-spacer) { flex: 0 0 90vw; }
+        .xnet-horizontal-track { gap: 60px; }
+        .track-spacer { flex: 0 0 5vw; }
+    }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private ElementReference containerRef;
+    private ElementReference trackRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                const container = document.querySelector('.xnet-sticky-trigger');
+                const track = document.querySelector('.xnet-horizontal-track');
+                const header = document.querySelector('#sticky-header');
+                
+                window.addEventListener('scroll', () => {
+                    if (!container || !track || !header) return;
+
+                    const offsetTop = container.offsetTop;
+                    const height = container.offsetHeight;
+                    const viewportHeight = window.innerHeight;
+                    const centerX = window.innerWidth / 2;
+                    
+                    const scrollProgress = (window.scrollY - offsetTop) / (height - viewportHeight);
+                    
+                    if (scrollProgress >= -0.1 && scrollProgress <= 1.1) {
+                        const moveX = Math.max(0, scrollProgress) * (track.scrollWidth - window.innerWidth);
+                        track.style.transform = `translateX(${-moveX}px)`;
+                        
+                        const fadeEnd = 0.05; // Sumindo 5% antes para evitar overlap
+                        const headerOpacity = Math.max(0, 1 - (scrollProgress / fadeEnd));
+                        header.style.opacity = headerOpacity;
+                        header.style.transform = `translateY(calc(-50% - ${scrollProgress * 300}px)) scale(${1 - scrollProgress * 0.2})`;
+                        header.style.filter = `blur(${scrollProgress * 30}px)`;
+
+                        const cards = track.querySelectorAll('.xnet-feature-card-wrapper');
+                        cards.forEach((cardWrapper) => {
+                             const card = cardWrapper.querySelector('.capability-card');
+                             const rect = cardWrapper.getBoundingClientRect();
+                             const cardCenter = rect.left + rect.width / 2;
+                             const distFromCenter = Math.abs(centerX - cardCenter);
+                             
+                             const normalizedDist = Math.min(distFromCenter / (window.innerWidth * 0.6), 1);
+                             const scale = 1.2 - (normalizedDist * 0.4); 
+                             const opacity = 1 - (normalizedDist * 0.7);
+                             const zIndex = Math.round((1 - normalizedDist) * 100);
+                             
+                             if (card) {
+                                card.style.transform = `scale(${scale})`;
+                                card.style.opacity = Math.max(0.1, opacity);
+                             }
+                             cardWrapper.style.zIndex = zIndex;
+                        });
+                    }
+                });
+            ");
+        }
+    }
+}

@@ -202,6 +202,45 @@ struct SettingsView: View {
                         .foregroundStyle(selectedTheme.foregroundColor)
                         .padding(.horizontal, 32)
                     
+                    // Official Website Link
+                    Button {
+                        if let url = URL(string: "https://xnet.cloud.queiros.com.br") {
+                            openURL(url)
+                        }
+                    } label: {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(selectedTheme.accentColor)
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "safari.fill")
+                                    .foregroundStyle(.white)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Site Oficial & Documentação")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(selectedTheme.foregroundColor)
+                                Text("xnet.cloud.queiros.com.br")
+                                    .font(.caption)
+                                    .foregroundStyle(selectedTheme.mutedColor)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(selectedTheme.mutedColor)
+                        }
+                        .padding(16)
+                        .background(selectedTheme.cardBackgroundColor.opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(selectedTheme.panelBorderColor.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 32)
+                    
                     Button {
                         if let url = URL(string: "https://github.com/kaua-alves-queiros/XNet") {
                             openURL(url)

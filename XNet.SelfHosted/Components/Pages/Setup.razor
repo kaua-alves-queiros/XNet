@@ -1,0 +1,198 @@
+@page "/setup"
+@using Microsoft.AspNetCore.Authorization
+@using XNet.SelfHosted.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject NavigationManager Nav
+@inject SignInManager<ApplicationUser> SignInManager
+
+<PageTitle>Setup - XNet SelfHosted</PageTitle>
+
+<div class="setup-wrapper">
+    <div class="glass-card setup-card animate-fade">
+        <div class="text-center mb-5">
+            <div class="brand-dot mb-4"></div>
+            <h1 class="display-6 fw-bold text-white mb-2">Welcome to XNet</h1>
+            <p class="text-description px-4">Let's set up your private server instance.</p>
+        </div>
+
+        @if (step == 1)
+        {
+            <div class="setup-content">
+                <div class="step-indicator mb-4">Step 1 of 2</div>
+                <h2 class="h5 fw-bold text-white mb-4">Organization Name</h2>
+                
+                <div class="form-group mb-5">
+                    <label class="form-label-apple">NAME</label>
+                    <input type="text" @bind="orgName" class="apple-input w-100" placeholder="e.g. My Home Network" />
+                </div>
+                
+                <button class="apple-btn-blue w-100 py-3 mt-2" @onclick="() => step = 2">
+                    Next Step <i class="bi bi-arrow-right ms-2"></i>
+                </button>
+            </div>
+        }
+        else if (step == 2)
+        {
+            <div class="setup-content">
+                <div class="step-indicator mb-4">Step 2 of 2</div>
+                <h2 class="h5 fw-bold text-white mb-4">Master Administrator</h2>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label-apple">ADMIN EMAIL</label>
+                    <input type="email" @bind="adminEmail" class="apple-input w-100" placeholder="admin@domain.com" />
+                </div>
+                
+                <div class="form-group mb-5">
+                    <label class="form-label-apple">SECURE PASSWORD</label>
+                    <input type="password" @bind="adminPassword" class="apple-input w-100" placeholder="••••••••" />
+                </div>
+                
+                <div class="d-flex gap-3">
+                    <button class="apple-btn-secondary w-50" @onclick="() => step = 1">
+                        <i class="bi bi-chevron-left"></i> Back
+                    </button>
+                    <button class="apple-btn-blue w-50" @onclick="FinishSetup" disabled="@isProcessing">
+                        @if (isProcessing) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        Finish <i class="bi bi-check-lg ms-2"></i>
+                    </button>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="error-toast mt-4 animate-fade">
+                <i class="bi bi-exclamation-circle-fill me-2"></i> @error
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .setup-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+    }
+
+    .setup-card {
+        max-width: 520px;
+        width: 100%;
+        padding: 60px 40px;
+    }
+
+    .step-indicator {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--apple-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .form-label-apple {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        display: block;
+        margin-left: 4px;
+    }
+
+    .apple-btn-secondary {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        color: #fff;
+        padding: 14px;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+
+    .apple-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .error-toast {
+        background: rgba(255, 69, 58, 0.15);
+        border: 1px solid rgba(255, 69, 58, 0.2);
+        color: #ff453a;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .brand-dot {
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
+@code {
+    private int step = 1;
+    private string orgName = "";
+    private string adminEmail = "";
+    private string adminPassword = "";
+    private string? error;
+    private bool isProcessing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var orgExists = await Db.Organizations.AnyAsync(o => o.IsConfigured);
+        if (orgExists) Nav.NavigateTo("/", true);
+    }
+
+    private async Task FinishSetup()
+    {
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword) || string.IsNullOrWhiteSpace(orgName))
+        {
+            error = "All fields are required.";
+            return;
+        }
+
+        isProcessing = true;
+        error = null;
+
+        try
+        {
+            var org = new Organization 
+            { 
+                Name = orgName, 
+                IsConfigured = true 
+            };
+            Db.Organizations.Add(org);
+            await Db.SaveChangesAsync();
+
+            if (!await RoleManager.RoleExistsAsync("Admin")) await RoleManager.CreateAsync(new IdentityRole("Admin"));
+            if (!await RoleManager.RoleExistsAsync("User")) await RoleManager.CreateAsync(new IdentityRole("User"));
+
+            var user = new ApplicationUser { UserName = adminEmail, Email = adminEmail, IsActive = true };
+            var result = await UserManager.CreateAsync(user, adminPassword);
+
+            if (result.Succeeded)
+            {
+                await UserManager.AddToRoleAsync(user, "Admin");
+                // Redireciona para o login para evitar erro de Headers Read-only
+                Nav.NavigateTo("Account/Login", true);
+            }
+            else
+            {
+                error = result.Errors.FirstOrDefault()?.Description ?? "Master account creation failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = "Critical error: " + ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

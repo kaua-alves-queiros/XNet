@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace XNet.Web.Models;
+namespace XNet.Shared.Models;
 
 public class Device
 {
@@ -23,4 +23,16 @@ public class Device
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public List<LogEntry> Logs { get; set; } = new();
+}
+
+public class LogEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Content { get; set; } = string.Empty;
+    public string Level { get; set; } = "Info";
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    
+    // Relations
+    public Guid DeviceId { get; set; }
+    public Device Device { get; set; } = null!;
 }

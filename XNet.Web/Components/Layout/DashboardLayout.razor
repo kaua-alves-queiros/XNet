@@ -1,0 +1,128 @@
+@inherits LayoutComponentBase
+
+<div class="dashboard-container">
+    <nav class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <img src="assets/logo.png" width="28" height="28" alt="XNet" />
+            <span>XNet Server</span>
+        </div>
+        <div class="sidebar-nav">
+            <a href="/dashboard" class="nav-item active">
+                <i class="bi bi-grid-1x2"></i> Status
+            </a>
+            <a href="/dashboard/devices" class="nav-item">
+                <i class="bi bi-cpu"></i> Devices
+            </a>
+            <a href="/dashboard/users" class="nav-item">
+                <i class="bi bi-people"></i> Users
+            </a>
+            <a href="/dashboard/settings" class="nav-item">
+                <i class="bi bi-gear"></i> Settings
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <span class="badge bg-success-subtle text-success border border-success-subtle">Free Tier</span>
+        </div>
+    </nav>
+    
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div class="d-flex align-items-center">
+                <h2 class="h5 fw-bold m-0 text-white">Dashboard Overview</h2>
+            </div>
+            <div class="header-actions">
+                <button class="apple-btn-blue">Generate Sync Token</button>
+            </div>
+        </header>
+
+        <div class="dashboard-content">
+            @Body
+        </div>
+    </main>
+</div>
+
+<style>
+    .dashboard-container {
+        display: flex;
+        min-height: 100vh;
+        background: #000;
+    }
+
+    .dashboard-sidebar {
+        width: 240px;
+        background: #111;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+    }
+
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+        font-size: 18px;
+        color: #fff;
+        margin-bottom: 40px;
+    }
+
+    .sidebar-nav {
+        flex-grow: 1;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        color: #a1a1a6;
+        text-decoration: none;
+        border-radius: 10px;
+        transition: all 0.2s;
+        margin-bottom: 4px;
+        font-size: 14px;
+    }
+
+    .nav-item i {
+        font-size: 18px;
+    }
+
+    .nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+    }
+
+    .nav-item.active {
+        background: #0071e3;
+        color: #fff;
+    }
+
+    .dashboard-main {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dashboard-header {
+        height: 64px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(20px);
+    }
+
+    .dashboard-content {
+        padding: 40px;
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+
+    .sidebar-footer {
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+</style>

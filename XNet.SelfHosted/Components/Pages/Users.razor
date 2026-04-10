@@ -1,0 +1,9 @@
+@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using XNet.Shared.Components.Management
+@attribute [Authorize(Roles = "Admin")]
+@layout DashboardLayout
+
+<PageTitle>User Management - XNet Console</PageTitle>
+
+<UserManagementView />

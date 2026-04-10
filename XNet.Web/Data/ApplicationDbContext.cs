@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using XNet.Web.Models;
+using XNet.Shared.Models;
 
 namespace XNet.Web.Data;
 

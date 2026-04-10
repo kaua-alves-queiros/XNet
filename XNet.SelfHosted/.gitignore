@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# DB
+Data/app.db*
+*.db
+*.db-shm
+*.db-wal
+
+# VS Code
+.vscode/
+
+# User-specific
+.aspnet/
+Properties/launchSettings.json

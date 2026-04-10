@@ -1,0 +1,133 @@
+@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@layout DashboardLayout
+@inject XNet.SelfHosted.Data.ApplicationDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Dashboard - XNet Console</PageTitle>
+
+<div class="animate-fade">
+    <div class="mb-5">
+        <h1 class="text-white mb-2">Network Overview</h1>
+        <p class="text-description">Real-time telemetry from your self-hosted XNet nodes.</p>
+    </div>
+
+    <!-- Stats Grid (Using CocoCard) -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <CocoCard Class="p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <div class="stat-icon bg-blue-soft"><i class="bi bi-cpu text-blue"></i></div>
+                    <CocoBadge Text="+2.4%" Status="CocoBadge.CocoStatus.Success" />
+                </div>
+                <div class="text-tertiary small uppercase fw-bold mb-1">CPU LOAD</div>
+                <div class="h3 fw-bold m-0">14.2%</div>
+            </CocoCard>
+        </div>
+        <div class="col-md-3">
+            <CocoCard Class="p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <div class="stat-icon bg-purple-soft"><i class="bi bi-memory text-purple"></i></div>
+                    <CocoBadge Text="Stable" Status="CocoBadge.CocoStatus.Info" />
+                </div>
+                <div class="text-tertiary small uppercase fw-bold mb-1">RAM USAGE</div>
+                <div class="h3 fw-bold m-0">2.4 GB</div>
+            </CocoCard>
+        </div>
+        <div class="col-md-3">
+            <CocoCard Class="p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <div class="stat-icon bg-green-soft"><i class="bi bi-hdd-network text-green"></i></div>
+                    <CocoBadge Text="89% Free" Status="CocoBadge.CocoStatus.Success" />
+                </div>
+                <div class="text-tertiary small uppercase fw-bold mb-1">STORAGE</div>
+                <div class="h3 fw-bold m-0">128 GB</div>
+            </CocoCard>
+        </div>
+        <div class="col-md-3">
+            <CocoCard Class="p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <div class="stat-icon bg-orange-soft"><i class="bi bi-activity text-orange"></i></div>
+                    <CocoBadge Text="+42ms" Status="CocoBadge.CocoStatus.Danger" />
+                </div>
+                <div class="text-tertiary small uppercase fw-bold mb-1">LATENCY</div>
+                <div class="h3 fw-bold m-0">12 ms</div>
+            </CocoCard>
+        </div>
+    </div>
+
+    <!-- Charts & Tables -->
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <CocoCard Class="p-4 h-100">
+                <h3 class="h6 fw-bold mb-5 uppercase letter-spacing-1">Network Traffic (24h)</h3>
+                <div class="chart-container">
+                    <svg viewBox="0 0 800 200" class="w-100">
+                        <defs>
+                            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#0071e3" stop-opacity="0.3" />
+                                <stop offset="100%" stop-color="#0071e3" stop-opacity="0" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M0,150 Q50,140 100,160 T200,120 T300,140 T400,100 T500,110 T600,80 T700,90 T800,70 L800,200 L0,200 Z" fill="url(#chartGradient)" />
+                        <path d="M0,150 Q50,140 100,160 T200,120 T300,140 T400,100 T500,110 T600,80 T700,90 T800,70" stroke="#0071e3" stroke-width="3" fill="none" />
+                        <circle cx="800" cy="70" r="4" fill="#0071e3" />
+                    </svg>
+                </div>
+            </CocoCard>
+        </div>
+        <div class="col-lg-4">
+            <CocoCard Class="p-4 h-100">
+                <h3 class="h6 fw-bold mb-5 uppercase letter-spacing-1">Node Health</h3>
+                <div class="health-list">
+                    <div class="health-item">
+                        <span>Database Server</span>
+                        <CocoBadge Text="Running" Status="CocoBadge.CocoStatus.Success" />
+                    </div>
+                    <div class="health-item">
+                        <span>MQTT Broker</span>
+                        <CocoBadge Text="Active" Status="CocoBadge.CocoStatus.Success" />
+                    </div>
+                    <div class="health-item">
+                        <span>API Gateway</span>
+                        <CocoBadge Text="Idle" Status="CocoBadge.CocoStatus.Warning" />
+                    </div>
+                    <div class="health-item">
+                        <span>System Load</span>
+                        <CocoBadge Text="Normal" Status="CocoBadge.CocoStatus.Success" />
+                    </div>
+                </div>
+            </CocoCard>
+        </div>
+    </div>
+</div>
+
+<style>
+    .stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .bg-blue-soft { background: rgba(0, 113, 227, 0.1); }
+    .bg-purple-soft { background: rgba(191, 90, 242, 0.1); }
+    .bg-green-soft { background: rgba(52, 199, 89, 0.1); }
+    .bg-orange-soft { background: rgba(255, 159, 10, 0.1); }
+    
+    .text-blue { color: #0071e3; }
+    .text-purple { color: #bf5af2; }
+    .text-green { color: #34c759; }
+    .text-orange { color: #ff9f0a; }
+
+    .health-list { display: flex; flex-direction: column; gap: 12px; }
+    .health-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 16px; background: rgba(255,255,255,0.03); border-radius: 14px;
+        font-size: 14px; font-weight: 500;
+    }
+</style>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var orgExists = await Db.Organizations.AnyAsync(o => o.IsConfigured);
+        if (!orgExists) Nav.NavigateTo("/setup", true);
+    }
+}

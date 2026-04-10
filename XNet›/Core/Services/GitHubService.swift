@@ -45,20 +45,33 @@ class GitHubService: ObservableObject {
     private let cacheDuration: TimeInterval = 7 * 24 * 60 * 60 // 1 week
     
     init() {
-        loadFromCache()
+        // Synchronous initial load to prevent flickering
+        if let data = UserDefaults.standard.data(forKey: cacheKey),
+           let cached = try? JSONDecoder().decode([GitHubUserDetails].self, from: data) {
+            self.contributors = cached
+            print("GitHub Service: Initialized with \(cached.count) contributors from cache.")
+        }
     }
     
     func fetchContributors() async {
+        // 1. Initial check
         let lastFetch = UserDefaults.standard.object(forKey: lastFetchKey) as? Date
-        let isCacheExpired = lastFetch == nil || Date().timeIntervalSince(lastFetch!) > cacheDuration
+        let now = Date()
         
-        // If cache is still valid and we have data, do nothing
+        // Prevent concurrent fetches
+        if isFetching { return }
+        
+        // 2. Determine if we need to hit the API
+        // We only fetch if cache is expired OR if it's empty
+        let isCacheExpired = lastFetch == nil || now.timeIntervalSince(lastFetch!) > cacheDuration
+        
         if !isCacheExpired && !contributors.isEmpty {
-            print("GitHub Team: Using valid cache (expires in \(Int((cacheDuration - Date().timeIntervalSince(lastFetch!)) / 3600)) hours)")
+            let hoursRemaining = Int((cacheDuration - now.timeIntervalSince(lastFetch!)) / 3600)
+            print("GitHub Service: Cache is active and valid. TTL: \(hoursRemaining)h.")
             return
         }
         
-        if isFetching { return }
+        print("GitHub Service: Cache expired or empty. Initiating refresh from GitHub API...")
         
         guard let url = URL(string: "https://api.github.com/repos/\(repoOwner)/\(repoName)/contributors") else { return }
         
@@ -71,6 +84,7 @@ class GitHubService: ObservableObject {
             // Limit to top 8 contributions for team overview
             var detailed: [GitHubUserDetails] = []
             for contributor in basicContributors.prefix(8) {
+                // Fetch each detail in parallel for speed if needed, but sequential is safer for rate limits
                 if let details = try? await fetchUserDetails(username: contributor.login) {
                     var finalDetails = details
                     finalDetails.contributions = contributor.contributions
@@ -78,34 +92,36 @@ class GitHubService: ObservableObject {
                 }
             }
             
-            await MainActor.run {
-                self.contributors = detailed
-                self.isFetching = false
-                self.saveToCache(detailed)
+            if !detailed.isEmpty {
+                await MainActor.run {
+                    self.contributors = detailed
+                    self.isFetching = false
+                    self.saveToCache(detailed)
+                }
+                print("GitHub Service: Successfully refreshed and cached \(detailed.count) contributors.")
+            } else {
+                await MainActor.run { isFetching = false }
             }
         } catch {
-            print("Failed to fetch GitHub contributors: \(error)")
+            print("GitHub Service: Failed to fetch: \(error.localizedDescription)")
             await MainActor.run { isFetching = false }
         }
     }
     
     private func fetchUserDetails(username: String) async throws -> GitHubUserDetails {
         guard let url = URL(string: "https://api.github.com/users/\(username)") else { throw URLError(.badURL) }
-        let (data, _) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        request.addValue("XNet-Professional-App", forHTTPHeaderField: "User-Agent")
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
         return try JSONDecoder().decode(GitHubUserDetails.self, from: data)
-    }
-    
-    @MainActor
-    private func loadFromCache() {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey),
-              let cached = try? JSONDecoder().decode([GitHubUserDetails].self, from: data) else { return }
-        self.contributors = cached
     }
     
     private func saveToCache(_ contributors: [GitHubUserDetails]) {
         if let data = try? JSONEncoder().encode(contributors) {
             UserDefaults.standard.set(data, forKey: cacheKey)
             UserDefaults.standard.set(Date(), forKey: lastFetchKey)
+            print("GitHub Service: Data persisted to UserDefaults.")
         }
     }
 }
