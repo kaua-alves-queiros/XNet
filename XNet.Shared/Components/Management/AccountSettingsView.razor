@@ -5,68 +5,87 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 
-<CocoSettingsLayout Tabs="@tabs" ActiveTab="@activeTab" OnTabChanged="tab => activeTab = tab">
-        @if (activeTab == "profile")
-        {
-            <div class="animate-fade">
-                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Personal Information</h4>
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <CocoInput Label="EMAIL ADDRESS" @bind-Value="currentUser.Email" Disabled="true" />
-                    </div>
-                    <div class="col-md-6">
-                        <CocoInput Label="FULL NAME" @bind-Value="currentUser.FullName" Placeholder="John Doe" />
-                    </div>
-                    <div class="col-md-12">
-                        <CocoButton OnClick="SaveProfile" Loading="@isSaving">Save Changes</CocoButton>
-                    </div>
+<div class="coco-page-container animate-fade-in">
+    <div class="coco-breadcrumb">
+        <span>Self-Hosted</span> / <span>Account Management</span>
+    </div>
+
+    <div class="coco-section-header">
+        <div class="w-100">
+            <CocoHeading Level="1">My Profile</CocoHeading>
+            <p class="coco-text-body mt-2">Manage your account authentication and primary contact email.</p>
+        </div>
+    </div>
+
+    <div class="settings-card-wrapper">
+        <div class="settings-container coco-glass">
+            <!-- Email Section -->
+            <div class="settings-section">
+                <div class="section-badge">PRIMARY EMAIL</div>
+                <div class="settings-row">
+                    <CocoInput Label="EMAIL ADDRESS" @bind-Value="currentUser.Email" Placeholder="admin@example.com" />
+                    <CocoButton OnClick="SaveEmail" Loading="@isSavingEmail" Style="height: 44px; min-width: 160px;">Update Email</CocoButton>
                 </div>
             </div>
-        }
-        else if (activeTab == "security")
-        {
-            <div class="animate-fade">
-                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Change Password</h4>
-                <div class="row g-4">
-                    <div class="col-md-12">
-                        <CocoInput Type="password" Label="CURRENT PASSWORD" @bind-Value="oldPassword" />
-                    </div>
-                    <div class="col-md-6">
+
+            <div class="divider"></div>
+
+            <!-- Password Section -->
+            <div class="settings-section">
+                <div class="section-badge">SECURITY & AUTHENTICATION</div>
+                <div class="settings-stack">
+                    <CocoInput Type="password" Label="CURRENT PASSWORD" @bind-Value="oldPassword" />
+                    <div class="settings-grid">
                         <CocoInput Type="password" Label="NEW PASSWORD" @bind-Value="newPassword" />
-                    </div>
-                    <div class="col-md-6">
                         <CocoInput Type="password" Label="CONFIRM NEW PASSWORD" @bind-Value="confirmPassword" />
                     </div>
-                    <div class="col-md-12">
-                        <CocoButton OnClick="ChangePassword" Loading="@isSaving">Update Password</CocoButton>
+                    <div class="section-actions mt-2">
+                        <CocoButton OnClick="ChangePassword" Loading="@isSavingPassword" Variant="primary" Class="w-100">Change Password</CocoButton>
                     </div>
                 </div>
             </div>
-        }
-        else if (activeTab == "2fa")
-        {
-            <div class="animate-fade">
-                <h4 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">Two-Factor Authentication</h4>
-                <div class="glass-card p-4 border-primary-soft">
-                    <p class="text-secondary small mb-4">Protect your account with an additional layer of security by requiring a code from your authenticator app.</p>
-                    <CocoButton OnClick="@(() => message = "2FA configuration is coming soon in the next update.")">Configure Authenticator App</CocoButton>
-                </div>
-            </div>
-        }
 
-        @if (!string.IsNullOrEmpty(message))
-        {
-            <div class="mt-4 p-3 rounded @(isError ? "bg-danger-soft text-danger" : "bg-success-soft text-success") animate-fade small">
-                @message
-            </div>
-        }
-    </CocoSettingsLayout>
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="status-message @(isError ? "error" : "success") animate-fade mt-4">
+                    @message
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-card-wrapper { display: flex; justify-content: flex-start; margin-top: 20px; }
+    .settings-container { width: 100%; max-width: 800px; padding: 40px; border-radius: 24px; }
+    
+    .settings-section { padding: 4px 0; }
+    .section-badge { font-size: 10px; font-weight: 800; color: var(--coco-blue); letter-spacing: 0.12em; margin-bottom: 24px; opacity: 0.8; }
+
+    .settings-row { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: flex-end; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .settings-stack { display: flex; flex-direction: column; gap: 24px; }
+
+    .divider { height: 1px; background: var(--coco-card-border); margin: 40px 0; }
+
+    .status-message {
+        padding: 14px 20px; border-radius: 12px; font-size: 13px; font-weight: 500;
+        backdrop-filter: blur(10px);
+    }
+    .status-message.success { background: rgba(50, 215, 75, 0.1); color: #32d74b; border: 1px solid rgba(50, 215, 75, 0.2); }
+    .status-message.error { background: rgba(255, 69, 58, 0.1); color: #ff453a; border: 1px solid rgba(255, 69, 58, 0.2); }
+
+    @@media (max-width: 768px) { 
+        .settings-row, .settings-grid { grid-template-columns: 1fr; }
+        .settings-container { padding: 24px; }
+    }
+</style>
 
 @code {
     [Parameter] public ApplicationUser currentUser { get; set; } = new();
 
-    private string activeTab = "profile";
-    private bool isSaving;
+    private bool isSavingEmail;
+    private bool isSavingPassword;
     private string? message;
     private bool isError;
 
@@ -74,49 +93,53 @@
     private string newPassword = "";
     private string confirmPassword = "";
 
-    private List<CocoSettingsLayout.CocoTabItem> tabs = new()
+    private async Task SaveEmail()
     {
-        new CocoSettingsLayout.CocoTabItem { Id = "profile", Label = "Profile", Icon = "bi-person-fill" },
-        new CocoSettingsLayout.CocoTabItem { Id = "security", Label = "Security", Icon = "bi-shield-lock-fill" },
-        new CocoSettingsLayout.CocoTabItem { Id = "2fa", Label = "2FA", Icon = "bi-key-fill" }
-    };
+        if (string.IsNullOrWhiteSpace(currentUser.Email)) return;
+        isSavingEmail = true;
+        message = null;
 
-    private async Task SaveProfile()
-    {
-        isSaving = true;
+        currentUser.UserName = currentUser.Email;
+        currentUser.NormalizedUserName = currentUser.Email.ToUpper();
+        currentUser.NormalizedEmail = currentUser.Email.ToUpper();
+
         var result = await UserManager.UpdateAsync(currentUser);
         if (result.Succeeded) {
-            message = "Profile updated successfully.";
+            message = "Email address updated successfully.";
             isError = false;
         } else {
             message = result.Errors.FirstOrDefault()?.Description;
             isError = true;
         }
-        isSaving = false;
+        isSavingEmail = false;
     }
 
     private async Task ChangePassword()
     {
-        if (newPassword != confirmPassword) {
-            message = "Passwords do not match.";
+        if (string.IsNullOrWhiteSpace(oldPassword) || string.IsNullOrWhiteSpace(newPassword)) {
+            message = "Please fill in all password fields.";
             isError = true;
             return;
         }
-        isSaving = true;
+
+        if (newPassword != confirmPassword) {
+            message = "New passwords do not match.";
+            isError = true;
+            return;
+        }
+
+        isSavingPassword = true;
+        message = null;
+
         var result = await UserManager.ChangePasswordAsync(currentUser, oldPassword, newPassword);
         if (result.Succeeded) {
-            message = "Password changed successfully.";
+            message = "Password has been successfully updated.";
             isError = false;
             oldPassword = newPassword = confirmPassword = "";
         } else {
             message = result.Errors.FirstOrDefault()?.Description;
             isError = true;
         }
-        isSaving = false;
+        isSavingPassword = false;
     }
 }
-
-<style>
-    .bg-success-soft { background: rgba(50, 215, 75, 0.1); }
-    .bg-danger-soft { background: rgba(255, 69, 58, 0.1); }
-</style>

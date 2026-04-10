@@ -5,94 +5,134 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
 
-<div class="animate-fade">
-    <div class="d-flex justify-content-between align-items-center mb-5">
+<div class="coco-page-container animate-fade-in">
+    <div class="coco-breadcrumb">
+        <span>Self-Hosted</span> / <span>Users</span>
+    </div>
+
+    <div class="coco-section-header">
         <div>
-            <h1 class="text-white m-0">User Management</h1>
-            <p class="text-description mb-0">Manage roles and security for your organization.</p>
+            <CocoHeading Level="1">User Management</CocoHeading>
+            <p class="coco-text-body mt-2">Manage roles and security for your organization.</p>
         </div>
-        <CocoButton OnClick="() => showAdd = !showAdd">
-            <i class="bi bi-person-plus-fill me-2"></i> Add Account
-        </CocoButton>
+        <div>
+            <CocoButton Variant="primary" Icon="bi-person-plus" OnClick="() => showAdd = !showAdd">Add Account</CocoButton>
+        </div>
     </div>
 
     @if (showAdd)
     {
-        <CocoCard Class="p-4 mb-5 animate-fade border-primary-soft">
-            <h3 class="h6 fw-bold text-white mb-4 uppercase letter-spacing-1">New User</h3>
-            <div class="row g-3">
-                <div class="col-md-3">
+        <div class="coco-form-card animate-fade">
+            <div class="form-header">
+                <span class="form-badge">NEW USER</span>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
                     <CocoInput Label="EMAIL" @bind-Value="newEmail" Placeholder="user@domain.com" />
                 </div>
-                <div class="col-md-3">
+                <div class="form-group">
                     <CocoInput Label="PASSWORD" Type="password" @bind-Value="newPassword" Placeholder="••••••••" />
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label-apple">PERMISSIONS</label>
-                    <select @bind="newRole" class="apple-input w-100" style="appearance: auto;">
-                        <option value="Admin">Administrator</option>
-                        <option value="User">Standard User</option>
-                    </select>
+                <div class="form-group">
+                    <label class="coco-label-standalone">PERMISSIONS</label>
+                    <div class="coco-select-container">
+                        <select @bind="newRole" class="coco-select">
+                            <option value="Admin">Administrator</option>
+                            <option value="User">Standard User</option>
+                        </select>
+                        <i class="bi bi-chevron-down select-chevron"></i>
+                    </div>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <CocoButton Class="w-100 py-3" OnClick="CreateUser" Loading="@isProcessing">Save User</CocoButton>
+                <div class="form-actions">
+                    <CocoButton Class="w-100" OnClick="CreateUser" Loading="@isProcessing">Save User</CocoButton>
                 </div>
             </div>
-            @if (!string.IsNullOrEmpty(error)) { <div class="text-danger mt-3 small">@error</div> }
-        </CocoCard>
+            @if (!string.IsNullOrEmpty(error)) { <div class="text-danger mt-3 small px-2">@error</div> }
+        </div>
     }
 
-    <CocoCard Class="p-0 overflow-hidden">
-        <table class="table table-dark table-hover m-0 apple-table">
+    <div class="coco-table-container">
+        <table class="coco-table">
             <thead>
                 <tr>
-                    <th class="ps-4">USER</th>
+                    <th>USER</th>
                     <th>ROLE</th>
                     <th>STATUS</th>
-                    <th class="text-end pe-4">ACTIONS</th>
+                    <th>ACTIONS</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var user in userList)
                 {
-                    <tr>
-                        <td class="ps-4">
-                            <div class="d-flex align-items-center gap-3 py-2">
-                                <div class="user-avatar-sm">@user.Email?[0].ToString().ToUpper()</div>
+                    <tr class="coco-table-row">
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                <CocoAvatar Text="@user.Email?[0].ToString().ToUpper()" />
                                 <div>
                                     <div class="fw-bold">@user.Email</div>
-                                    <div class="text-tertiary smaller">Joined @user.CreatedAt.ToShortDateString()</div>
+                                    <div class="coco-text-tertiary" style="font-size: 11px;">Joined @user.CreatedAt.ToString("MM/dd/yyyy")</div>
                                 </div>
                             </div>
                         </td>
                         <td>
-                            <CocoBadge Text="@userRoles.GetValueOrDefault(user.Id, "User")" 
-                                       Status="@(IsAdmin(user) ? CocoBadge.CocoStatus.Info : CocoBadge.CocoStatus.Info)" />
+                            <CocoBadge Status="@(IsAdmin(user) ? CocoBadge.CocoStatus.Info : CocoBadge.CocoStatus.Info)">
+                                @userRoles.GetValueOrDefault(user.Id, "User")
+                            </CocoBadge>
                         </td>
                         <td>
-                            <CocoBadge Text="@(user.IsActive ? "ACTIVE" : "SUSPENDED")" 
-                                       Status="@(user.IsActive ? CocoBadge.CocoStatus.Success : CocoBadge.CocoStatus.Danger)" />
+                            <CocoBadge Status="@(user.IsActive ? CocoBadge.CocoStatus.Success : CocoBadge.CocoStatus.Danger)">
+                                @(user.IsActive ? "ACTIVE" : "SUSPENDED")
+                            </CocoBadge>
                         </td>
-                        <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-link text-white-50 text-decoration-none" @onclick="() => ToggleStatus(user)">
-                                @(user.IsActive ? "Deactivate" : "Activate")
-                            </button>
-                            @if (user.Email != "admin@admin.com")
-                            {
-                                <button class="btn btn-sm btn-link text-danger text-decoration-none ms-2" @onclick="() => DeleteUser(user)">Delete</button>
-                            }
+                        <td>
+                            <div class="table-actions">
+                                <button class="action-btn" @onclick="() => ToggleStatus(user)">
+                                    @(user.IsActive ? "Deactivate" : "Activate")
+                                </button>
+                                @if (user.Email != "admin@example.com")
+                                {
+                                    <button class="action-btn delete" @onclick="() => DeleteUser(user)">Delete</button>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
-    </CocoCard>
+    </div>
 </div>
 
 <style>
-    .apple-table th { background: rgba(255,255,255,0.02); color: #8e8e93; font-size: 11px; font-weight: 700; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .apple-table td { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
-    .user-avatar-sm { width: 32px; height: 32px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+    .management-subtitle { color: var(--coco-text-secondary); font-size: 15px; margin: 0; }
+
+    .coco-form-card { 
+        background: rgba(40, 40, 42, 0.3); border: 1px solid var(--coco-card-border); 
+        border-radius: 20px; padding: 24px; margin-bottom: 40px;
+    }
+    .form-header { margin-bottom: 20px; }
+    .form-badge { font-size: 10px; font-weight: 800; color: var(--coco-blue); letter-spacing: 0.12em; opacity: 0.8; }
+    
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr 160px; gap: 20px; align-items: flex-end; }
+    .coco-label-standalone { display: block; font-size: 11px; font-weight: 700; color: var(--coco-text-secondary); letter-spacing: 0.08em; margin-bottom: 10px; margin-left: 4px; }
+    
+    .coco-select-container { position: relative; }
+    .select-chevron { position: absolute; right: 14px; top: 14px; color: var(--coco-text-tertiary); pointer-events: none; font-size: 12px; }
+
+    .coco-table-container { 
+        background: var(--coco-card-bg); border: 1px solid var(--coco-card-border); 
+        border-radius: 20px; overflow: hidden; backdrop-filter: blur(var(--coco-glass-blur));
+    }
+    .coco-table { width: 100%; border-collapse: collapse; }
+    .coco-table th { background: rgba(255,255,255,0.02); color: var(--coco-text-secondary); font-size: 11px; font-weight: 700; padding: 16px; border-bottom: 1px solid var(--coco-card-border); }
+    .coco-table-row { transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .coco-table-row:hover { background: rgba(255,255,255,0.02); }
+    .coco-table td { padding: 16px; vertical-align: middle; }
+
+    .table-actions { display: flex; gap: 12px; justify-content: flex-end; }
+    .action-btn { background: none; border: none; font-size: 13px; font-weight: 500; color: var(--coco-text-tertiary); padding: 6px 10px; border-radius: 6px; transition: all 0.2s; }
+    .action-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .action-btn.delete { color: var(--coco-red); }
+    .action-btn.delete:hover { background: rgba(255, 69, 58, 0.1); }
 </style>
 
 @code {
