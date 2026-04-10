@@ -1,0 +1,121 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+<aside class="xnet-sidebar">
+    <div class="sidebar-brand">
+        <img src="assets/logo.png" width="32" height="32" alt="logo" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
+        <span class="brand-text">XNet Self-Hosted</span>
+    </div>
+
+    <nav class="sidebar-menu">
+        @foreach (var group in MenuGroups)
+        {
+            <div class="menu-label">@group.Label</div>
+            @foreach (var item in group.Items)
+            {
+                <NavLink class="xnet-nav-link" href="@item.Href" Match="@item.Match">
+                    <i class="bi @item.Icon"></i>
+                    <span>@item.Text</span>
+                </NavLink>
+            }
+        }
+    </nav>
+
+    <div class="sidebar-footer">
+        @FooterContent
+    </div>
+</aside>
+
+<style>
+    .xnet-sidebar {
+        width: 260px;
+        background: #000;
+        border-right: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 32px 16px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+    }
+
+    .xnet-brand-dot {
+        width: 20px; height: 20px;
+        background: linear-gradient(135deg, #00b4ff, #0071e3);
+        border-radius: 50%;
+        box-shadow: 0 0 20px rgba(0, 113, 227, 0.4);
+    }
+
+    .sidebar-brand {
+        display: flex; align-items: center; gap: 12px;
+        padding: 0 16px; margin-bottom: 40px;
+    }
+
+    .brand-text {
+        font-size: 19px; font-weight: 700; color: #fff;
+        letter-spacing: -0.02em;
+    }
+
+    .menu-label {
+        font-size: 11px; font-weight: 700; color: #6e6e73;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        padding: 24px 16px 8px;
+    }
+
+    .sidebar-menu { flex-grow: 1; }
+
+    .xnet-nav-link {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        padding: 10px 16px !important;
+        border-radius: 10px !important;
+        color: #8e8e93 !important;
+        text-decoration: none !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        margin-bottom: 2px !important;
+    }
+
+    .xnet-nav-link i {
+        font-size: 18px !important;
+        width: 24px !important;
+        text-align: center !important;
+    }
+
+    .xnet-nav-link:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #fff !important;
+        text-decoration: none !important;
+    }
+
+    .xnet-nav-link.active {
+        background: rgba(0, 113, 227, 0.1) !important;
+        color: #00b4ff !important;
+        font-weight: 600 !important;
+    }
+
+    .sidebar-footer { 
+        padding-top: 20px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+    }
+</style>
+
+@code {
+    [Parameter] public List<MenuGroup> MenuGroups { get; set; } = new();
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+
+    public class MenuGroup
+    {
+        public string Label { get; set; } = "";
+        public List<MenuItem> Items { get; set; } = new();
+    }
+
+    public class MenuItem
+    {
+        public string Text { get; set; } = "";
+        public string Href { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+    }
+}
