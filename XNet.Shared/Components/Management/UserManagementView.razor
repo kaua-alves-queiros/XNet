@@ -5,21 +5,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
 
-<div class="coco-page-container animate-fade-in">
-    <div class="coco-breadcrumb">
-        <span>Self-Hosted</span> / <span>Users</span>
-    </div>
-
-    <div class="coco-section-header">
-        <div>
-            <CocoHeading Level="1">User Management</CocoHeading>
-            <p class="coco-text-body mt-2">Manage roles and security for your organization.</p>
-        </div>
-        <div>
-            <CocoButton Variant="primary" Icon="bi-person-plus" OnClick="() => showAdd = !showAdd">Add Account</CocoButton>
-        </div>
-    </div>
-
+<div class="animate-fade">
     @if (showAdd)
     {
         <div class="coco-form-card animate-fade">
@@ -51,55 +37,65 @@
         </div>
     }
 
-    <div class="coco-table-container">
-        <table class="coco-table">
-            <thead>
-                <tr>
-                    <th>USER</th>
-                    <th>ROLE</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var user in userList)
-                {
-                    <tr class="coco-table-row">
-                        <td>
-                            <div class="d-flex align-items-center gap-3">
-                                <CocoAvatar Text="@user.Email?[0].ToString().ToUpper()" />
-                                <div>
-                                    <div class="fw-bold">@user.Email</div>
-                                    <div class="coco-text-tertiary" style="font-size: 11px;">Joined @user.CreatedAt.ToString("MM/dd/yyyy")</div>
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h1 class="text-white mb-2" style="border: none !important; outline: none !important;">User Management</h1>
+            <p class="text-description">Manage roles and security for your organization.</p>
+        </div>
+        <CocoButton Type="CocoButton.CocoType.Primary" Icon="bi-person-plus" OnClick="() => showAdd = !showAdd">
+            Add Account
+        </CocoButton>
+    </div>
+
+    <CocoCard Class="p-0 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table user-table-custom m-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">USER</th>
+                        <th>ROLE</th>
+                        <th>STATUS</th>
+                        <th class="pe-4 text-end">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in userList)
+                    {
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="user-avatar-small">@(user.Email?[0].ToString().ToUpper())</div>
+                                    <div>
+                                        <div class="fw-bold text-white">@user.Email</div>
+                                        <div class="text-tertiary" style="font-size: 11px;">Joined @user.CreatedAt.ToString("MM/dd/yyyy")</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </td>
-                        <td>
-                            <CocoBadge Status="@(IsAdmin(user) ? CocoBadge.CocoStatus.Info : CocoBadge.CocoStatus.Info)">
-                                @userRoles.GetValueOrDefault(user.Id, "User")
-                            </CocoBadge>
-                        </td>
-                        <td>
-                            <CocoBadge Status="@(user.IsActive ? CocoBadge.CocoStatus.Success : CocoBadge.CocoStatus.Danger)">
-                                @(user.IsActive ? "ACTIVE" : "SUSPENDED")
-                            </CocoBadge>
-                        </td>
-                        <td>
-                            <div class="table-actions">
-                                <button class="action-btn" @onclick="() => ToggleStatus(user)">
-                                    @(user.IsActive ? "Deactivate" : "Activate")
+                            </td>
+                            <td>
+                                <CocoBadge Status="@(IsAdmin(user) ? CocoBadge.CocoStatus.Info : CocoBadge.CocoStatus.Info)">
+                                    @userRoles.GetValueOrDefault(user.Id, "User")
+                                </CocoBadge>
+                            </td>
+                            <td>
+                                <CocoBadge Status="@(user.IsActive ? CocoBadge.CocoStatus.Success : CocoBadge.CocoStatus.Danger)">
+                                    @(user.IsActive ? "ACTIVE" : "SUSPENDED")
+                                </CocoBadge>
+                            </td>
+                            <td class="pe-4 text-end">
+                                <button class="btn-action" @onclick="() => ToggleStatus(user)">
+                                    <i class="bi @(user.IsActive ? "bi-person-x" : "bi-person-check")"></i>
                                 </button>
                                 @if (user.Email != "admin@example.com")
                                 {
-                                    <button class="action-btn delete" @onclick="() => DeleteUser(user)">Delete</button>
+                                    <button class="btn-action ms-2" @onclick="() => DeleteUser(user)"><i class="bi bi-trash"></i></button>
                                 }
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </CocoCard>
 </div>
 
 <style>
@@ -118,21 +114,32 @@
     .coco-select-container { position: relative; }
     .select-chevron { position: absolute; right: 14px; top: 14px; color: var(--coco-text-tertiary); pointer-events: none; font-size: 12px; }
 
-    .coco-table-container { 
-        background: var(--coco-card-bg); border: 1px solid var(--coco-card-border); 
-        border-radius: 20px; overflow: hidden; backdrop-filter: blur(var(--coco-glass-blur));
+    .user-table-custom { --bs-table-bg: transparent; border-collapse: separate; border-spacing: 0; }
+    .user-table-custom thead th { 
+        background: rgba(255,255,255,0.02); 
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        color: #6e6e73; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+        padding: 16px 12px;
     }
-    .coco-table { width: 100%; border-collapse: collapse; }
-    .coco-table th { background: rgba(255,255,255,0.02); color: var(--coco-text-secondary); font-size: 11px; font-weight: 700; padding: 16px; border-bottom: 1px solid var(--coco-card-border); }
-    .coco-table-row { transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.03); }
-    .coco-table-row:hover { background: rgba(255,255,255,0.02); }
-    .coco-table td { padding: 16px; vertical-align: middle; }
+    .user-table-custom tbody td { 
+        padding: 20px 12px; 
+        border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;
+        color: #acacb3; font-size: 14px;
+    }
 
-    .table-actions { display: flex; gap: 12px; justify-content: flex-end; }
-    .action-btn { background: none; border: none; font-size: 13px; font-weight: 500; color: var(--coco-text-tertiary); padding: 6px 10px; border-radius: 6px; transition: all 0.2s; }
-    .action-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .action-btn.delete { color: var(--coco-red); }
-    .action-btn.delete:hover { background: rgba(255, 69, 58, 0.1); }
+    .user-avatar-small { 
+        width: 32px; height: 32px; background: rgba(255,255,255,0.05); 
+        border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 700; font-size: 12px;
+    }
+
+    .btn-action { 
+        background: rgba(255,255,255,0.05); border: none; width: 32px; height: 32px; 
+        border-radius: 8px; color: #fff; display: inline-flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .btn-action:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .btn-action i { font-size: 14px; }
 </style>
 
 @code {

@@ -44,6 +44,9 @@
     .user-name { font-size: 14px; font-weight: 600; color: #fff; }
     .logout-btn { background: none; border: none; color: #6e6e73; font-size: 12px; padding: 0; }
     .h-nav { height: 52px; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
+    
+    h1, h2, h3 { border: none !important; outline: none !important; box-shadow: none !important; }
+    h1:focus, h2:focus, h3:focus { border: none !important; outline: none !important; box-shadow: none !important; }
 </style>
 
 @code {
@@ -54,7 +57,8 @@
             Items = new() {
                 new CocoSidebar.MenuItem { Text = "Dashboard", Href = "", Icon = "bi-grid-fill", Match = NavLinkMatch.All },
                 new CocoSidebar.MenuItem { Text = "Users", Href = "users", Icon = "bi-people-fill" },
-                new CocoSidebar.MenuItem { Text = "Devices", Href = "devices", Icon = "bi-hdd-network-fill" }
+                new CocoSidebar.MenuItem { Text = "Devices", Href = "devices", Icon = "bi-hdd-network-fill" },
+                new CocoSidebar.MenuItem { Text = "Terminal Logs", Href = "terminal-logs", Icon = "bi-terminal-fill" }
             }
         },
         new CocoSidebar.MenuGroup { 
