@@ -9,8 +9,8 @@
         <input type="@Type" 
                class="coco-input" 
                placeholder="@Placeholder" 
-               @bind="Value" 
-               @bind:event="oninput" 
+               value="@Value"
+               @oninput="HandleInput"
                disabled="@Disabled" />
     </div>
 </div>
@@ -74,4 +74,10 @@
     
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
 }

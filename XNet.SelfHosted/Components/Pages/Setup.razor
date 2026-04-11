@@ -11,126 +11,157 @@
 
 <PageTitle>Setup - XNet SelfHosted</PageTitle>
 
-<div class="setup-wrapper">
-    <div class="glass-card setup-card animate-fade">
+@using XNet.Shared.Components.CocoUi
+
+<PageTitle>Setup Engine — XNet Self-Hosted</PageTitle>
+
+<div class="setup-canvas">
+    <div class="glow-sphere sphere-1"></div>
+    <div class="glow-sphere sphere-2"></div>
+    
+    <CocoCard Class="setup-container animate-fade-in" Style="max-width: 500px; padding: 48px;">
         <div class="text-center mb-5">
-            <div class="brand-dot mb-4"></div>
-            <h1 class="display-6 fw-bold text-white mb-2">Welcome to XNet</h1>
-            <p class="text-description px-4">Let's set up your private server instance.</p>
+            <div class="setup-icon-box mb-4">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <CocoHeading Level="1" Class="text-white mb-2">Initialize XNet</CocoHeading>
+            <p class="text-tertiary">Configure your private self-hosted instance and master administrator.</p>
         </div>
 
         @if (step == 1)
         {
-            <div class="setup-content">
-                <div class="step-indicator mb-4">Step 1 of 2</div>
-                <h2 class="h5 fw-bold text-white mb-4">Organization Name</h2>
+            <div class="animate-slide-up">
+                <div class="step-label">PHASE 01 — INFRASTRUCTURE</div>
+                <h3 class="text-white h5 mb-4">Organization Identity</h3>
                 
-                <div class="form-group mb-5">
-                    <label class="form-label-apple">NAME</label>
-                    <input type="text" @bind="orgName" class="apple-input w-100" placeholder="e.g. My Home Network" />
+                <div class="mb-5">
+                    <CocoInput Label="ORGANIZATION NAME" 
+                               Placeholder="e.g. Acme Network Instance" 
+                               @bind-Value="orgName" />
+                    <p class="small text-tertiary mt-2">This will be shown in all headers and reports.</p>
                 </div>
                 
-                <button class="apple-btn-blue w-100 py-3 mt-2" @onclick="() => step = 2">
-                    Next Step <i class="bi bi-arrow-right ms-2"></i>
-                </button>
+                <CocoButton Variant="primary" Class="w-100 py-3" OnClick="() => step = 2">
+                    Proceed to Admin <i class="bi bi-arrow-right ms-2"></i>
+                </CocoButton>
             </div>
         }
         else if (step == 2)
         {
-            <div class="setup-content">
-                <div class="step-indicator mb-4">Step 2 of 2</div>
-                <h2 class="h5 fw-bold text-white mb-4">Master Administrator</h2>
+            <div class="animate-slide-up">
+                <div class="step-label">PHASE 02 — SECURITY</div>
+                <h3 class="text-white h5 mb-4">Master Administrator</h3>
                 
-                <div class="form-group mb-3">
-                    <label class="form-label-apple">ADMIN EMAIL</label>
-                    <input type="email" @bind="adminEmail" class="apple-input w-100" placeholder="admin@domain.com" />
+                <div class="mb-4">
+                    <CocoInput Label="ADMIN EMAIL" 
+                               Type="email"
+                               Placeholder="admin@xnet.internal" 
+                               @bind-Value="adminEmail" />
                 </div>
                 
-                <div class="form-group mb-5">
-                    <label class="form-label-apple">SECURE PASSWORD</label>
-                    <input type="password" @bind="adminPassword" class="apple-input w-100" placeholder="••••••••" />
+                <div class="mb-5">
+                    <CocoInput Label="SECURE PASSWORD" 
+                               Type="password"
+                               Placeholder="••••••••" 
+                               @bind-Value="adminPassword" />
+                    <p class="small text-tertiary mt-2">Minimum 6 characters required for encryption.</p>
                 </div>
                 
                 <div class="d-flex gap-3">
-                    <button class="apple-btn-secondary w-50" @onclick="() => step = 1">
-                        <i class="bi bi-chevron-left"></i> Back
-                    </button>
-                    <button class="apple-btn-blue w-50" @onclick="FinishSetup" disabled="@isProcessing">
-                        @if (isProcessing) { <span class="spinner-border spinner-border-sm me-2"></span> }
-                        Finish <i class="bi bi-check-lg ms-2"></i>
-                    </button>
+                    <CocoButton Variant="secondary" Class="w-50" OnClick="() => step = 1">
+                        Back
+                    </CocoButton>
+                    <CocoButton Variant="primary" Class="w-50" OnClick="FinishSetup" Loading="@isProcessing">
+                        Finalize Setup <i class="bi bi-rocket-takeoff ms-2"></i>
+                    </CocoButton>
                 </div>
             </div>
         }
 
         @if (!string.IsNullOrEmpty(error))
         {
-            <div class="error-toast mt-4 animate-fade">
-                <i class="bi bi-exclamation-circle-fill me-2"></i> @error
+            <div class="error-alert mt-4">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> @error
             </div>
         }
-    </div>
+        
+        <div class="setup-footer mt-5 text-center">
+            <span class="text-tertiary small">XNet Self-Hosted v2.5.0</span>
+        </div>
+    </CocoCard>
 </div>
 
 <style>
-    .setup-wrapper {
+    .setup-canvas {
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: #09090b;
+        position: relative;
+        overflow: hidden;
         padding: 40px 20px;
     }
 
-    .setup-card {
-        max-width: 520px;
-        width: 100%;
-        padding: 60px 40px;
+    .glow-sphere {
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        border-radius: 50%;
+        filter: blur(100px);
+        opacity: 0.15;
+        z-index: 0;
+    }
+    .sphere-1 { top: -100px; right: -100px; background: var(--xnet-accent); }
+    .sphere-2 { bottom: -100px; left: -100px; background: #6366f1; }
+
+    .setup-container {
+        position: relative;
+        z-index: 2;
     }
 
-    .step-indicator {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--apple-accent);
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
+    .setup-icon-box {
+        width: 64px;
+        height: 64px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        font-size: 28px;
+        color: var(--xnet-accent);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
 
-    .form-label-apple {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--text-secondary);
-        margin-bottom: 8px;
-        display: block;
-        margin-left: 4px;
+    .step-label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        color: var(--xnet-accent);
+        margin-bottom: 12px;
+        opacity: 0.8;
     }
 
-    .apple-btn-secondary {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        color: #fff;
+    .error-alert {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: #ef4444;
         padding: 14px;
-        font-weight: 600;
-        transition: 0.3s;
-    }
-
-    .apple-btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .error-toast {
-        background: rgba(255, 69, 58, 0.15);
-        border: 1px solid rgba(255, 69, 58, 0.2);
-        color: #ff453a;
-        padding: 12px 20px;
         border-radius: 12px;
-        font-size: 14px;
+        font-size: 13px;
+        font-weight: 500;
         text-align: center;
     }
 
-    .brand-dot {
-        margin-left: auto;
-        margin-right: auto;
+    .animate-slide-up {
+        animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 </style>
 

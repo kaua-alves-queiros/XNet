@@ -249,12 +249,13 @@ a.text-white:hover {
 }
 
 .doc-sidebar-link.active {
-    background: var(--apple-accent);
-    color: #ffffff;
-    font-weight: 500;
+    background: rgba(10, 132, 255, 0.1) !important;
+    color: #0a84ff !important;
+    font-weight: 600;
 }
 
 .doc-sidebar-link.active i {
+    color: #0a84ff;
     opacity: 1;
 }
 

@@ -5,6 +5,8 @@ import IOKit.ps
 
 struct HomeView: View {
     @State private var dashboardData = DashboardData()
+    @StateObject private var connectivityStore = XNetConnectivityStore.shared
+    @State private var nodeHealth: String = "Stand-alone"
     @State private var isRefreshing = false
     @State private var selectedThemeID = TerminalThemeStore.readThemeID()
     
@@ -135,10 +137,10 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Painel de Controle")
+                    Text(connectivityStore.mode == .selfHosted ? "Visualização Remota" : "Painel de Controle")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(selectedTheme.foregroundColor)
-                    Text("Monitoramento em tempo real do sistema, conectividade e tráfego da rede.")
+                    Text(connectivityStore.mode == .selfHosted ? "Sincronizado com: \(connectivityStore.serverUrl)" : "Monitoramento em tempo real do sistema, conectividade e tráfego da rede.")
                         .font(.title3)
                         .foregroundStyle(selectedTheme.mutedColor)
                 }
@@ -558,7 +560,31 @@ struct DashboardData {
             copy.publicIP = pubIP
         }
         
+        // 5. Opcional: Fetch Server Data se Self-Hosted
+        if XNetConnectivityStore.shared.mode == .selfHosted && !XNetConnectivityStore.shared.apiToken.isEmpty {
+            if let serverData = await fetchServerTelemetry() {
+                // Mesclar dados do servidor no Dashboard (Opcional, ou mostrar em outro lugar)
+                // Por exemplo, podemos priorizar a CPU do servidor se estivermos monitorando nodes
+            }
+        }
+        
         return copy
+    }
+
+    private func fetchServerTelemetry() async -> Data? {
+        let store = XNetConnectivityStore.shared
+        guard let url = URL(string: "\(store.serverUrl)/api/telemetry/health") else { return nil }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(store.apiToken)", forHTTPHeaderField: "Authorization")
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            // Aqui poderíamos parsear o NetworkHealthDto
+            return data
+        } catch {
+            return nil
+        }
     }
     
     private func formatSpeed(_ bitsPerSecond: Double) -> String {

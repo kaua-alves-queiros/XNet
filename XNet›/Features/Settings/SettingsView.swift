@@ -8,12 +8,15 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var modelContext
     
+    @StateObject private var connectivityStore = XNetConnectivityStore.shared
+    
     // Data Management States
     @State private var showingDeviceImporter = false
     @State private var showingDeviceExporter = false
     @State private var exportDocument = TerminalDeviceRegistryDocument()
     @State private var importError: String?
     @State private var showingImportError = false
+    @State private var showingLoginSheet = false
     
     private var selectedTheme: TerminalTheme {
         TerminalTheme(rawValue: selectedThemeID) ?? .defaultTheme
@@ -60,8 +63,98 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 32)
+                    .padding(.horizontal, 32)
                     }
+                }
+                
+                // Conectividade
+                VStack(alignment: .leading, spacing: 20) {
+                    Label("Conectividade e Sincronização", systemImage: "network")
+                        .font(.headline)
+                        .foregroundStyle(selectedTheme.foregroundColor)
+                        .padding(.horizontal, 32)
+                    
+                    VStack(spacing: 0) {
+                        Picker("", selection: $connectivityStore.mode) {
+                            ForEach(XNetConnectionMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(16)
+                        
+                        if connectivityStore.mode == .selfHosted {
+                            VStack(spacing: 12) {
+                                Divider().background(selectedTheme.panelBorderColor.opacity(0.2)).padding(.horizontal, 16)
+                                
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("URL DO SERVIDOR")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(selectedTheme.mutedColor)
+                                        TextField("http://sua-instancia:5239", text: $connectivityStore.serverUrl)
+                                            .textFieldStyle(.plain)
+                                            .foregroundStyle(selectedTheme.foregroundColor)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    HStack(spacing: 8) {
+                                        Button {
+                                            Task {
+                                                _ = await connectivityStore.testConnection()
+                                            }
+                                        } label: {
+                                            Text("Testar Link")
+                                                .font(.caption.bold())
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(selectedTheme.accentColor.opacity(0.12))
+                                                .clipShape(Capsule())
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+
+                                Divider().background(selectedTheme.panelBorderColor.opacity(0.2)).padding(.horizontal, 16)
+
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("AUTENTICAÇÃO")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(selectedTheme.mutedColor)
+                                        Text(connectivityStore.apiToken.isEmpty ? "Não Autenticado" : "Conectado ✅")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(connectivityStore.apiToken.isEmpty ? .red : .green)
+                                    }
+                                    Spacer()
+                                    
+                                    Button {
+                                        showingLoginSheet = true
+                                    } label: {
+                                        Text(connectivityStore.apiToken.isEmpty ? "Fazer Login" : "Alternar Conta")
+                                            .font(.caption.bold())
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(selectedTheme.foregroundColor.opacity(0.08))
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 16)
+                            }
+                        }
+                    }
+                    .background(selectedTheme.cardBackgroundColor.opacity(0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(selectedTheme.panelBorderColor.opacity(0.3), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 32)
                 }
                 
                 // App Information
@@ -326,6 +419,9 @@ struct SettingsView: View {
             Button("OK", role: .cancel) { }
         } message: {
             if let error = importError { Text(error) }
+        }
+        .sheet(isPresented: $showingLoginSheet) {
+            LoginView(theme: selectedTheme)
         }
     }
     

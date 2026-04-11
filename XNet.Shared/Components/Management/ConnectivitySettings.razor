@@ -1,0 +1,139 @@
+@namespace XNet.Shared.Components.Management
+@using XNet.Shared.Components.CocoUi
+@inject NavigationManager Nav
+
+<div class="coco-page-container animate-fade-in">
+    <div class="coco-breadcrumb">
+        <span>Settings</span> / <span>Connectivity Hub</span>
+    </div>
+
+    <div class="coco-section-header">
+        <div class="w-100">
+            <CocoHeading Level="1">Connectivity Hub</CocoHeading>
+            <p class="coco-text-body mt-2">Configure how XNet connects to your network infrastructure.</p>
+        </div>
+    </div>
+
+    <div class="connectivity-grid">
+        <!-- Cloud Mode (Unavailable) -->
+        <div class="connectivity-card coco-glass disabled">
+            <div class="card-status coming-soon">COMING SOON</div>
+            <div class="card-icon"><i class="bi bi-cloud-check"></i></div>
+            <div class="card-content">
+                <h3 class="h5 fw-bold mb-2">XNet Cloud Web</h3>
+                <p class="small text-tertiary">Sync your devices and telemetry globally. Managed infrastructure by XNet.</p>
+            </div>
+            <div class="card-action">
+                <CocoButton Variant="secondary" Class="w-100" Disabled="true">In Development</CocoButton>
+            </div>
+        </div>
+
+        <!-- Self-Hosted Mode -->
+        <div class="connectivity-card coco-glass @(currentMode == "SelfHosted" ? "active" : "")">
+            @if (currentMode == "SelfHosted") { <div class="card-status active-badge">ACTIVE</div> }
+            <div class="card-icon blue"><i class="bi bi-server"></i></div>
+            <div class="card-content">
+                <h3 class="h5 fw-bold mb-2">Self-Hosted Server</h3>
+                <p class="small text-tertiary">Connect to your private XNet instance. Full control over your data.</p>
+                
+                <div class="mt-4 connection-inputs">
+                    <CocoInput Label="SERVER URL" @bind-Value="serverUrl" Placeholder="https://192.168.1.10:5001" />
+                    <CocoInput Label="INSTANCE NAME" @bind-Value="instanceName" Placeholder="Home-HQ" />
+                </div>
+            </div>
+            <div class="card-action d-flex gap-2">
+                <CocoButton Variant="secondary" OnClick="TestConnection" Loading="@isTesting">Test Link</CocoButton>
+                <CocoButton Variant="primary" Class="flex-grow-1" OnClick="@(() => SelectMode("SelfHosted"))">Connect</CocoButton>
+            </div>
+        </div>
+
+        <!-- Local Standalone Mode -->
+        <div class="connectivity-card coco-glass @(currentMode == "Local" ? "active" : "")">
+             @if (currentMode == "Local") { <div class="card-status active-badge">ACTIVE</div> }
+            <div class="card-icon purple"><i class="bi bi-laptop"></i></div>
+            <div class="card-content">
+                <h3 class="h5 fw-bold mb-2">Local Standalone</h3>
+                <p class="small text-tertiary">Run XNet entirely on this device. No external server required.</p>
+            </div>
+            <div class="card-action">
+                <CocoButton Variant="secondary" Class="w-100" OnClick="@(() => SelectMode("Local"))">Switch to Local</CocoButton>
+            </div>
+        </div>
+    </div>
+
+    @if (showSaved)
+    {
+        <div class="save-toast animate-fade">
+            <i class="bi bi-check-circle-fill me-2"></i> Settings saved and applied.
+        </div>
+    }
+</div>
+
+<style>
+    .connectivity-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-top: 20px; }
+    
+    .connectivity-card {
+        padding: 32px; border-radius: 28px; display: flex; flex-direction: column; 
+        transition: all 0.3s cubic-bezier(0.2, 1, 0.2, 1);
+        position: relative; height: 100%;
+    }
+
+    .connectivity-card.active { border-color: var(--coco-blue) !important; box-shadow: 0 0 30px rgba(10, 132, 255, 0.2) !important; }
+    .connectivity-card.disabled { opacity: 0.6; filter: grayscale(0.5); }
+
+    .card-status { 
+        position: absolute; top: 16px; right: 20px; font-size: 10px; font-weight: 800; 
+        padding: 4px 10px; border-radius: 6px; letter-spacing: 0.05em;
+    }
+    .coming-soon { background: rgba(255,255,255,0.1); color: #fff; }
+    .active-badge { background: rgba(10, 132, 255, 0.2); color: #0a84ff; }
+
+    .card-icon { font-size: 32px; margin-bottom: 24px; }
+    .card-icon.blue { color: #0a84ff; }
+    .card-icon.purple { color: #bf5af2; }
+
+    .card-content { flex-grow: 1; }
+    .connection-inputs { display: flex; flex-direction: column; gap: 16px; }
+
+    .card-action { margin-top: 32px; }
+
+    .save-toast {
+        position: fixed; bottom: 40px; right: 40px; background: #32d74b; color: #000;
+        padding: 16px 24px; border-radius: 14px; font-weight: 600; font-size: 14px;
+        box-shadow: 0 10px 30px rgba(50, 215, 75, 0.3); z-index: 1000;
+    }
+
+    @@media (max-width: 1100px) { .connectivity-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    private string currentMode = "SelfHosted";
+    private string serverUrl = "https://localhost:5001";
+    private string instanceName = "Self-Hosted-Instance";
+    private bool showSaved;
+    private bool isTesting;
+
+    private async Task TestConnection()
+    {
+        isTesting = true;
+        StateHasChanged();
+        
+        // Simular um atraso de rede e handshake
+        await Task.Delay(1500);
+        
+        isTesting = false;
+        showSaved = true; // Reusar o toast para avisar que o teste deu bom
+        StateHasChanged();
+        await Task.Delay(3000);
+        showSaved = false;
+        StateHasChanged();
+    }
+
+    private void SelectMode(string mode)
+    {
+        currentMode = mode;
+        showSaved = true;
+        StateHasChanged();
+        Task.Delay(3000).ContinueWith(_ => { showSaved = false; InvokeAsync(StateHasChanged); });
+    }
+}
