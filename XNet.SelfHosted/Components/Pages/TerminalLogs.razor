@@ -1,0 +1,202 @@
+@page "/terminal-logs"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using XNet.SelfHosted.Data
+@using XNet.Shared.Models
+@layout DashboardLayout
+@attribute [Authorize]
+@inject ApplicationDbContext Db
+
+<PageTitle>Terminal History — XNet</PageTitle>
+
+<div class="coco-page-header mb-5">
+    <div class="d-flex justify-content-between align-items-end">
+        <div>
+            <div class="coco-breadcrumb">Management / History</div>
+            <CocoHeading Level="1">Terminal Logs</CocoHeading>
+            <p class="text-tertiary mt-2">Audit and review all remote access sessions across your infrastructure.</p>
+        </div>
+        <div class="header-actions">
+            <CocoBadge Status="CocoBadge.CocoStatus.Info">@($"{logs.Count} Sessions")</CocoBadge>
+        </div>
+    </div>
+</div>
+
+<div class="history-grid">
+    <CocoCard Class="logs-list-card">
+        <div class="table-responsive">
+            <table class="coco-table">
+                <thead>
+                    <tr>
+                        <th>SESSION</th>
+                        <th>TARGET</th>
+                        <th>PROTOCOL</th>
+                        <th>STAMP</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!logs.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-tertiary italic">No terminal sessions recorded yet.</td>
+                        </tr>
+                    }
+                    @foreach (var log in logs)
+                    {
+                        <tr class="@(selectedLog?.Id == log.Id ? "active" : "")" @onclick="() => SelectLog(log)">
+                            <td>
+                                <div class="session-title">@(string.IsNullOrEmpty(log.Title) ? "Untitled Session" : log.Title)</div>
+                                <div class="session-id">@log.Id.ToString().Substring(0, 8)</div>
+                            </td>
+                            <td>
+                                <div class="host-badge">
+                                    <i class="bi bi-pc-display me-1"></i> @log.Host
+                                </div>
+                            </td>
+                            <td>
+                                <CocoBadge Status="CocoBadge.CocoStatus.Info">@log.ConnectionType</CocoBadge>
+                            </td>
+                            <td>
+                                <div class="timestamp">@log.StartedAt.ToString("MMM dd, HH:mm")</div>
+                                <div class="duration">@CalculateDuration(log)</div>
+                            </td>
+                            <td>
+                                <button class="view-btn"><i class="bi bi-chevron-right"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </CocoCard>
+
+    @if (selectedLog != null)
+    {
+        <CocoCard Class="log-detail-card animate-slide-left">
+            <div class="detail-header">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h3 class="text-white h5 mb-1">@selectedLog.Title</h3>
+                        <p class="small text-tertiary">@selectedLog.Host:@selectedLog.Port</p>
+                    </div>
+                    <button class="close-btn" @onclick="() => selectedLog = null"><i class="bi bi-x-lg"></i></button>
+                </div>
+                
+                <div class="session-meta mb-4">
+                    <div class="meta-item">
+                        <span class="label">USER</span>
+                        <span class="val">@selectedLog.Username</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="label">STARTED</span>
+                        <span class="val">@selectedLog.StartedAt.ToString("g")</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="terminal-capture">
+                <div class="capture-toolbar">
+                    <span class="small opacity-50">RAW OUTPUT</span>
+                    <button class="copy-btn" @onclick="CopyContent"><i class="bi bi-clipboard"></i> Copy</button>
+                </div>
+                <pre class="capture-content">@selectedLog.Content</pre>
+            </div>
+        </CocoCard>
+    }
+</div>
+
+<style>
+    .history-grid {
+        display: grid;
+        grid-template-columns: 1fr @(selectedLog != null ? "400px" : "0px");
+        gap: 24px;
+        transition: all 0.4s cubic-bezier(0.2, 1, 0.2, 1);
+    }
+
+    .logs-list-card { padding: 0 !important; overflow: hidden; }
+
+    .coco-table { width: 100%; border-collapse: collapse; }
+    .coco-table th { 
+        padding: 16px 24px; text-align: left; font-size: 10px; font-weight: 800; 
+        color: #6e6e73; text-transform: uppercase; letter-spacing: 0.1em;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .coco-table td { padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.02); cursor: pointer; }
+    .coco-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .coco-table tr.active td { background: rgba(10, 132, 255, 0.08); border-bottom-color: rgba(10, 132, 255, 0.2); }
+
+    .session-title { font-weight: 600; color: #fff; font-size: 14px; }
+    .session-id { font-size: 11px; color: #6e6e73; font-family: 'JetBrains Mono', monospace; }
+
+    .host-badge { font-size: 13px; color: #8e8e93; font-weight: 500; }
+    .timestamp { font-size: 13px; color: #fff; font-weight: 500; }
+    .duration { font-size: 11px; color: #6e6e73; }
+
+    .view-btn { background: none; border: none; color: #6e6e73; transition: 0.2s; }
+    .coco-table tr:hover .view-btn { color: #fff; transform: translateX(3px); }
+
+    .log-detail-card { 
+        position: sticky; top: 40px; height: calc(100vh - 120px); 
+        display: flex; flex-direction: column;
+    }
+
+    .close-btn { background: none; border: none; color: #6e6e73; }
+    .close-btn:hover { color: #fff; }
+
+    .session-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .meta-item .label { display: block; font-size: 9px; font-weight: 800; color: #6e6e73; margin-bottom: 4px; }
+    .meta-item .val { font-size: 12px; color: #fff; font-weight: 500; }
+
+    .terminal-capture { 
+        flex: 1; background: #000; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    .capture-toolbar { 
+        padding: 8px 16px; background: rgba(255,255,255,0.02); 
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .copy-btn { background: none; border: none; color: var(--xnet-accent); font-size: 11px; font-weight: 700; }
+    
+    .capture-content { 
+        padding: 16px; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; 
+        color: #d1d1d6; overflow-y: auto; line-height: 1.5; white-space: pre-wrap;
+    }
+
+    .animate-slide-left {
+        animation: slideLeft 0.4s cubic-bezier(0.2, 1, 0.2, 1);
+    }
+
+    @@keyframes slideLeft {
+        from { opacity: 0; transform: translateX(30px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+</style>
+
+@code {
+    private List<TerminalLog> logs = new();
+    private TerminalLog? selectedLog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        logs = await Db.TerminalLogs.OrderByDescending(l => l.StartedAt).ToListAsync();
+    }
+
+    private void SelectLog(TerminalLog log)
+    {
+        selectedLog = log;
+    }
+
+    private string CalculateDuration(TerminalLog log)
+    {
+        var duration = log.EndedAt - log.StartedAt;
+        if (duration.TotalMinutes < 1) return $"{duration.Seconds}s elapsed";
+        return $"{Math.Floor(duration.TotalMinutes)}m {duration.Seconds}s";
+    }
+
+    private void CopyContent()
+    {
+        // Implementar via JS Interop se necessário
+    }
+}

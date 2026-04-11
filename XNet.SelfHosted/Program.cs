@@ -44,6 +44,26 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+// API Support
+builder.Services.AddControllers();
+
+// JWT Authentication for Swift App
+builder.Services.AddAuthentication()
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "XNetServer",
+            ValidAudience = "XNetSwiftApp",
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes("XNet_Super_Secret_Key_For_Swift_App_2026!"))
+        };
+    });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -69,11 +89,15 @@ app.MapRazorComponents<App>()
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
+app.MapControllers(); // Habilita os novos endpoints da API
+
 // Auto apply migrations
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
+    // Usa EnsureCreated para garantir que todas as novas tabelas (NetBox/Terminal) sejam criadas
+    // sem precisar gerenciar migrações complexas agora no desenvolvimento.
+    await dbContext.Database.EnsureCreatedAsync();
 }
 
 app.Run();
