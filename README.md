@@ -29,7 +29,18 @@ For detailed documentation, capabilities overview, and latest releases, please v
 - **Network Planning**: Bit-level Subnet & VLSM Calculators.
 - **Unified Remote**: Protocol-aware Terminal (SSH/Telnet) & FTP orchestration.
 - **Professional Storage**: Local SwiftData persistence + NetBox inventory sync.
+- **Self-Hosted Hub**: Private synchronization server for documents, logs, and accounts.
 - **Native Design**: Built 100% in Swift/SwiftUI for macOS with Apple's material design.
+
+---
+
+## ☁️ XNet Synchronization Hub
+Deploy your own private infrastructure to keep your network documentation in sync across multiple macOS devices.
+
+- **Centralized Inventory**: Management of NetBox objects and credentials.
+- **Encrypted Logs**: Secure synchronization of terminal session history.
+- **Role-Based Access**: Multi-user support with administrative control.
+- **SQLite Powered**: Lightweight, high-performance database-driven backend.
 
 ---
 
