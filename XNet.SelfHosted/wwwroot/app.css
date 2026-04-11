@@ -66,3 +66,13 @@ body {
     font-size: 12px;
     font-weight: 600;
 }
+/* Absolute Nuke on persistent blue borders */
+h1, h2, h3, div:focus, h1:focus, .mb-5:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+:not(input):not(textarea):focus {
+    outline: none !important;
+}
