@@ -9,19 +9,72 @@
         <div class="doc-main-content animate-fade">
             <h1 class="display-4 fw-bold text-white mb-4">Self-Hosted Server</h1>
             
-            <div class="glass-card border-warning-subtle p-3 mb-5 d-flex align-items-center" style="background: rgba(255, 149, 0, 0.1);">
-                <i class="bi bi-tools text-warning fs-4 me-3"></i>
+            <div class="glass-card border-success-subtle p-3 mb-5 d-flex align-items-center" style="background: rgba(48, 209, 88, 0.1);">
+                <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
                 <div>
-                    <h4 class="h6 text-white fw-bold mb-1">Coming Soon: Active Development</h4>
-                    <p class="small text-sf-secondary m-0">The Self-Hosted module is currently in early development. API schemas and architecture plans are subject to change.</p>
+                    <h4 class="h6 text-white fw-bold mb-1">Production Ready: XNet Hub v1.0</h4>
+                    <p class="small text-sf-secondary m-0">The Self-Hosted Synchronization Hub is now available with full support for cross-platform data consistency.</p>
                 </div>
             </div>
 
-            <p class="hero-description mb-5">Take control of your data with a private XNet Instance.</p>
+            <p class="hero-description mb-5">The XNet Synchronization Hub is a high-performance, private server designed to act as the central brain for your distributed network operations. Built on ASP.NET Core and SQLite, it provides a lightweight but robust infrastructure for modern engineers.</p>
 
             <div class="doc-section mb-5">
-                <h2 class="h3 text-white mb-3">Privacy First</h2>
-                <p class="text-sf-secondary">XNet Self-Hosted is a specialized server module designed to store your network inventory (NetBox), encrypted session credentials, and automation snippets. By hosting your own server, you ensure that no sensitive network data ever leaves your controlled perimeter.</p>
+                <h2 class="h3 text-white mb-3">Core Capabilities</h2>
+                <div class="row g-4 mt-2">
+                    <div class="col-md-6">
+                        <div class="p-4 rounded-4" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                            <h4 class="text-white h5 mb-3"><i class="bi bi-shield-lock me-2 text-info"></i> Security</h4>
+                            <p class="text-sf-secondary small m-0">Role-Based Access Control (RBAC) and encrypted storage for all sensitive session credentials and terminal logs.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-4 rounded-4" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                            <h4 class="text-white h5 mb-3"><i class="bi bi-arrow-repeat me-2 text-success"></i> Sync Engine</h4>
+                            <p class="text-sf-secondary small m-0">Advanced synchronization protocol supporting "Push" and "Merge" strategies for NetBox objects and device inventory.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Deployment Guide</h2>
+                <p class="text-sf-secondary">Setting up your private Hub is straightforward and designed for simplicity.</p>
+                <div class="mt-4 ms-2">
+                    <div class="d-flex gap-3 mb-4">
+                        <div class="badge bg-white text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">1</div>
+                        <div>
+                            <h5 class="text-white h6 mb-1">Clone & Build</h5>
+                            <p class="text-sf-secondary small">Navigate to <code>XNet.SelfHosted</code> and run <code>dotnet build</code> to prepare the server binaries.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3 mb-4">
+                        <div class="badge bg-white text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">2</div>
+                        <div>
+                            <h5 class="text-white h6 mb-1">Configuration</h5>
+                            <p class="text-sf-secondary small">Adjust the <code>appsettings.json</code> to point to your desired storage path. The system defaults to a local SQLite instance for Zero-Config deployment.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div class="badge bg-white text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">3</div>
+                        <div>
+                            <h5 class="text-white h6 mb-1">Client Pairing</h5>
+                            <p class="text-sf-secondary small">In the macOS XNet app, go to Settings > Synchronization and enter your Server URL. Use the generated API key for secure pairing.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="doc-section mb-5">
+                <h2 class="h3 text-white mb-3">Architecture</h2>
+                <div class="p-4 rounded-4" style="background: rgba(255,255,255,0.01); border: 1px dashed rgba(255,255,255,0.1);">
+                    <ul class="text-sf-secondary small list-unstyled">
+                        <li class="mb-2"><i class="bi bi-cpu me-2"></i> <strong>Runtime:</strong> .NET 10 (Next-Gen)</li>
+                        <li class="mb-2"><i class="bi bi-database me-2"></i> <strong>Storage:</strong> SQLite with Entity Framework Core</li>
+                        <li class="mb-2"><i class="bi bi-hdd-network me-2"></i> <strong>API Strategy:</strong> RESTful with Bearer Token Auth</li>
+                        <li><i class="bi bi-window-sidebar me-2"></i> <strong>Dashboard:</strong> Blazor Interactive Server</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
